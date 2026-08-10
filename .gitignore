@@ -4,6 +4,7 @@ dev.db
 dev.db-journal
 .vercel
 *.log
+*.tsbuildinfo
 
 .projects/cache
 .projects/vault
