@@ -1,0 +1,347 @@
+// StudSwap data model
+// Dev: SQLite (file-based, zero setup)
+// Prod: switch provider to "postgresql" and set DATABASE_URL to your Neon connection string
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth.js required tables ----------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- Core app models ----------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  // Set only for accounts that chose password sign-in; magic-link-only
+  // accounts have no password and can't use the credentials login form.
+  passwordHash  String?
+  // Set the first time the user accepts the Terms of Service + Peer Swap
+  // Agreement (required before onboarding, see /onboarding step 0). Null
+  // means they haven't agreed yet.
+  acceptedTermsAt DateTime?
+  createdAt     DateTime  @default(now())
+  // Free-text instructions for how someone should pay this user directly
+  // (e.g. "PayPal: name@example.com", IBAN, Venmo handle). StudSwap never
+  // moves this money — it's only ever displayed to a matched counterpart
+  // after both sides confirm, see Match.
+  paymentHandle String?
+
+  // Stripe Connect Express account — created lazily, only once this user is
+  // actually owed a forfeiture payout (see ForfeiturePayout), never at
+  // signup. This is real money StudSwap sends TO the user (unlike
+  // paymentHandle above, which is just displayed text), so it needs a real
+  // payout-capable account with identity verification behind it.
+  stripeConnectAccountId       String?
+  // Cached from the account.updated webhook so payout attempts don't need a
+  // live Stripe API call just to check onboarding status. Stays false until
+  // Stripe confirms the account can actually receive transfers.
+  stripeConnectPayoutsEnabled  Boolean @default(false)
+
+  accounts Account[]
+  sessions Session[]
+
+  profile Profile?
+
+  swipesGiven Swipe[] @relation("SwipesGiven")
+  swipesReceived Swipe[] @relation("SwipesReceived")
+
+  matchesAsUserA Match[] @relation("MatchUserA")
+  matchesAsUserB Match[] @relation("MatchUserB")
+
+  messagesSent Message[]
+
+  forfeiturePayouts ForfeiturePayout[]
+
+  ratingsGiven    Rating[] @relation("RatingsGiven")
+  ratingsReceived Rating[] @relation("RatingsReceived")
+}
+
+// One flat/profile per user for v1
+model Profile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  name          String
+  age           Int
+  university    String
+  program       String
+  yearOfStudy   String   // "1st year" | "2nd year" | "3rd year" | "Master's" | "PhD"
+  homeCity      String
+  // Exact street address. Only ever shown to the other side of a confirmed
+  // match, or on your own profile, never on the public swipe card, so a
+  // random stranger browsing can't see where you live.
+  address       String?
+  availableFrom DateTime
+  availableTo   DateTime
+  accommodates  Int      // how many people the flat can host
+  // Self-set price per day, in cents (EUR). Informational only — used to
+  // calculate and display the stay cost / fairness difference between two
+  // profiles, see Match.settlementAmountCents. StudSwap never collects or
+  // moves this money; the two users settle it directly between themselves.
+  pricePerDayCents Int
+  smoker        String   // "No" | "Occasionally" | "Yes" | "Prefer not to say"
+  pets          String   // "No pets" | "Have a pet" | "Open to pets" | "Prefer not to say"
+  // JSON-encoded string arrays, e.g. '["https://...","https://..."]'. Kept as two
+  // separate fields (rather than one ordered list) so "which photos are of you"
+  // vs. "which are of the flat" is unambiguous, selfPhotoUrls[0] is the profile picture.
+  selfPhotoUrls String
+  flatPhotoUrls String
+  // Free-text bios shown on the profile card, separate from the prompt Q&A below.
+  selfDescription String?
+  flatDescription String?
+  prompts       String   // JSON-encoded array of { question, answer }
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Denormalized rating aggregate (see Rating model / swapLifecycle.ts):
+  // lives here, not computed live, so the swipe candidate batch fetch (up to
+  // 100 Profile rows, see /api/profile GET) stays a single flat query with no
+  // per-candidate join. Null averages/percentages mean cold start (never
+  // rendered as a bare 0 — see ProfileCard's "New to StudSwap" treatment).
+  completedSwapCount     Int    @default(0)
+  ratingCount            Int    @default(0)
+  ratingOverallAvg       Float?
+  ratingCommunicationAvg Float?
+  ratingFlatMatchedPct   Float?
+  ratingWouldAgainPct    Float?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Swipe {
+  id          String   @id @default(cuid())
+  swiperId    String
+  targetId    String
+  direction   String   // "LEFT" | "RIGHT"
+  createdAt   DateTime @default(now())
+
+  swiper User @relation("SwipesGiven", fields: [swiperId], references: [id], onDelete: Cascade)
+  target User @relation("SwipesReceived", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([swiperId, targetId]) // a user can only swipe on another user once
+}
+
+model Match {
+  id            String   @id @default(cuid())
+  userAId       String
+  userBId       String
+  type          String   @default("MUTUAL") // "MUTUAL" (both swiped right) | "PAID" (one side unlocked a one-directional stay)
+  paidByUserId  String? // set when type is "PAID": who's paying for the stay
+  // StudSwap is matchmaking only — no money moves through the app for the
+  // stay itself, ever. The two sides discuss and agree on stay dates in
+  // chat (stayFrom/stayTo), then each confirms by paying the €25
+  // confirmation charge (see confirmationPaymentIntentIdUserA/B below);
+  // once both have paid, the match is VALIDATED and settlementAmountCents
+  // is computed and frozen as a snapshot for display only.
+  status            String    @default("PENDING") // "PENDING" | "VALIDATED" | "CANCELLED"
+  stayFrom          DateTime?
+  stayTo            DateTime?
+  // Negotiated price/day in cents, agreed via chat (propose+confirm, same as
+  // dates) — lets the two sides settle on a price instead of being stuck
+  // with whatever's listed. PAID: negotiatedPricePerDayCentsPaid overrides
+  // the owner's listed price, it's the rate the payer owes them directly.
+  // MUTUAL: negotiatedPricePerDayCentsUserA/B override each side's OWN
+  // listed price independently, so there's still a real fairness gap to
+  // compute (falls back to that side's listed pricePerDayCents when unset).
+  negotiatedPricePerDayCentsPaid  Int?
+  negotiatedPricePerDayCentsUserA Int?
+  negotiatedPricePerDayCentsUserB Int?
+  confirmedByUserA  Boolean   @default(false) // true once this side's €25 confirmation charge has succeeded (see webhook)
+  confirmedByUserB  Boolean   @default(false)
+  // Informational snapshot, computed once at validation time (fairness gap
+  // for MUTUAL, full stay cost for PAID) so the Your swaps page has a stable
+  // historical record. StudSwap calculates, displays, and records this
+  // number — it never charges, holds, or transfers it. The two users settle
+  // it directly between themselves, by whatever means they choose (see
+  // User.paymentHandle). settlementAmountCents is 0 when nothing is owed;
+  // settlementPayerId is who owes it, null when nobody does.
+  settlementAmountCents Int      @default(0)
+  settlementPayerId     String?
+  // Self-reported only — StudSwap has no way to verify an off-platform
+  // payment actually happened. Shown to both sides; never reconciled or
+  // enforced.
+  settlementMarkedPaidByPayer          Boolean @default(false)
+  settlementConfirmedReceivedByPayee   Boolean @default(false)
+  // The €25-per-person confirmation charge (€5 non-refundable service fee +
+  // €20 refundable, refunded on completion). This money belongs to StudSwap
+  // from the moment it's charged, subject to a contractual promise to
+  // refund the €20 portion — it is never held on the user's behalf. One
+  // Stripe Checkout Session/PaymentIntent per side; charged fields are null
+  // until that side's payment succeeds (see /api/stripe/webhook).
+  confirmationPaymentIntentIdUserA String?
+  confirmationPaymentIntentIdUserB String?
+  confirmationChargedAtUserA       DateTime?
+  confirmationChargedAtUserB       DateTime?
+  // Outcome of the €20 refundable portion for each side: "PENDING" until the
+  // stay has been underway for a day or the match is cancelled, then
+  // "REFUNDED" (refunded to that side) or "FORFEITED" (that side cancelled
+  // late — see cancellationPolicy.ts and ForfeiturePayout).
+  refundableStatusUserA     String    @default("PENDING")
+  refundableStatusUserB     String    @default("PENDING")
+  refundableResolvedAtUserA DateTime?
+  refundableResolvedAtUserB DateTime?
+  cancelledAt          DateTime?
+  cancelledByUserId    String? // bare column, no relation, matches settlementPayerId convention
+  // Lazy "swap completed" reconciliation (see swapLifecycle.ts):
+  // completedProcessedAt is an idempotency guard (only ever set once, the
+  // first time anyone loads a page touching this match after stayTo has
+  // passed); ratingWindowClosesAt is stayTo + the configured rating window,
+  // set at the same time.
+  completedProcessedAt DateTime?
+  ratingWindowClosesAt DateTime?
+  // Bumped whenever each side opens this match's chat, compared against
+  // lastActivityAt below to show an unread badge on the Matches/Liked tabs.
+  lastReadAtUserA   DateTime?
+  lastReadAtUserB   DateTime?
+  // The single source of truth for "is there something new here" — bumped
+  // on match creation and on every message/propose/confirm/cancel, together
+  // with who caused it, so the OTHER side (never the actor themselves) sees
+  // an unread signal regardless of whether it was a chat message or
+  // something else (new match, new proposed dates, a confirm, a
+  // cancellation). See /api/notifications, /api/matches, /api/likes.
+  lastActivityAt       DateTime @default(now())
+  lastActivityByUserId String?
+  createdAt     DateTime @default(now())
+
+  userA User @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  messages Message[]
+  ratings           Rating[]
+  cancellationLogs  CancellationLog[]
+  forfeiturePayouts ForfeiturePayout[]
+
+  @@unique([userAId, userBId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  matchId   String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  match  Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  sender User  @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+// One rating per (match, rater) once the swap's stay has ended (see
+// swapLifecycle.ts) — the counterpart's submission stays blind (only "you
+// rated, waiting on them") until both sides have submitted or the rating
+// window closes, whichever first (see /api/matches/[id]/ratings). Feeds
+// Profile's denormalized rating aggregate.
+model Rating {
+  id                 String   @id @default(cuid())
+  matchId            String
+  raterId            String
+  rateeId            String
+  overall            Int // 1-5, the headline number shown as a badge
+  flatMatchedListing Boolean // "was the flat as described"
+  communication      Int // 1-5
+  wouldSwapAgain     Boolean
+  createdAt          DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  rater User  @relation("RatingsGiven", fields: [raterId], references: [id], onDelete: Cascade)
+  ratee User  @relation("RatingsReceived", fields: [rateeId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, raterId])
+  @@index([rateeId])
+}
+
+// Append-only audit trail written by every cancellation (even free/zero-
+// amount ones), for dispute reference — kept separate from Match's own
+// cancellation fields so it survives as an immutable record of exactly what
+// was computed and transferred at the time.
+model CancellationLog {
+  id                       String   @id @default(cuid())
+  matchId                  String
+  cancelledByUserId        String
+  affectedUserId           String
+  stayFrom                 DateTime // snapshot
+  cancelledAt              DateTime @default(now())
+  daysNotice               Float // (stayFrom - cancelledAt) in days; can be negative if cancelled after stayFrom
+  // Only the canceller's own €20 refundable portion is ever at stake — the
+  // other side's €20 is refunded immediately either way, since the stay
+  // isn't happening (see cancellationPolicy.ts). The €5 service fee is
+  // never refunded to either side regardless of outcome.
+  outcome                  String // "REFUNDED" | "FORFEITED"
+  refundableForfeitedCents Int // 0 if REFUNDED, 2000 if FORFEITED
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+}
+
+// A payout StudSwap owes someone — created when the other side of their
+// match cancelled late and forfeited their €20 refundable portion (see
+// cancellationPolicy.ts). This is NOT a balance: it is never summed, never
+// applied toward a future charge, and never spent — each row is a single
+// obligation, paid via a real Stripe Connect transfer (see
+// stripeConnect.ts) once the recipient has a payout-capable account, or
+// left PENDING until they set one up (see User.stripeConnectAccountId).
+model ForfeiturePayout {
+  id            String    @id @default(cuid())
+  matchId       String
+  recipientUserId String
+  amountCents   Int       @default(2000)
+  status        String    @default("PENDING") // "PENDING" | "PAID"
+  note          String?
+  // Set once the Stripe Transfer actually succeeds — the idempotency guard
+  // that stops a payout from ever being sent twice.
+  stripeTransferId String?
+  // Updated on every attempt, success or failure (e.g. the platform's test
+  // balance hasn't settled yet) — lets the UI tell the recipient "we tried
+  // as recently as X" instead of a static, meaningless "in progress".
+  lastAttemptAt DateTime?
+  createdAt     DateTime  @default(now())
+  paidAt        DateTime?
+
+  match     Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  recipient User  @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([recipientUserId])
+}
