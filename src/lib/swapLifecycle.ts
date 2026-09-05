@@ -15,6 +15,7 @@
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { CANCELLATION_POLICY } from "@/lib/cancellationPolicy";
+import { resolveNoShowIfReported } from "@/lib/noShow";
 
 const REFUND_ELIGIBLE_AFTER_MS = 24 * 60 * 60 * 1000; // one day into the stay
 
@@ -30,6 +31,7 @@ interface MatchForLifecycle {
   confirmationPaymentIntentIdUserB: string | null;
   refundableStatusUserA: string;
   refundableStatusUserB: string;
+  noShowReportedByUserId: string | null;
 }
 
 export async function processSwapLifecycleIfNeeded(match: MatchForLifecycle): Promise<void> {
@@ -46,7 +48,25 @@ export async function processSwapLifecycleIfNeeded(match: MatchForLifecycle): Pr
   // after a prior transient Stripe failure — without risking a double
   // refund.
   if (now.getTime() - match.stayFrom.getTime() >= REFUND_ELIGIBLE_AFTER_MS) {
-    if (match.refundableStatusUserA === "PENDING" && match.confirmationPaymentIntentIdUserA) {
+    // A no-show report against a side blocks its own automatic refund and
+    // routes it through the same forfeit-plus-compensation outcome as a
+    // late cancellation instead — see noShow.ts. Checked first, and each
+    // side re-checks PENDING itself, so this is safe to call every time
+    // regardless of which (if either) side was reported.
+    const noShowResolvedA = await resolveNoShowIfReported(
+      prisma,
+      { ...match, stayFrom: match.stayFrom },
+      "A",
+      now
+    );
+    const noShowResolvedB = await resolveNoShowIfReported(
+      prisma,
+      { ...match, stayFrom: match.stayFrom },
+      "B",
+      now
+    );
+
+    if (!noShowResolvedA && match.refundableStatusUserA === "PENDING" && match.confirmationPaymentIntentIdUserA) {
       await stripe.refunds.create({
         payment_intent: match.confirmationPaymentIntentIdUserA,
         amount: CANCELLATION_POLICY.refundableCents,
@@ -56,7 +76,7 @@ export async function processSwapLifecycleIfNeeded(match: MatchForLifecycle): Pr
         data: { refundableStatusUserA: "REFUNDED", refundableResolvedAtUserA: now },
       });
     }
-    if (match.refundableStatusUserB === "PENDING" && match.confirmationPaymentIntentIdUserB) {
+    if (!noShowResolvedB && match.refundableStatusUserB === "PENDING" && match.confirmationPaymentIntentIdUserB) {
       await stripe.refunds.create({
         payment_intent: match.confirmationPaymentIntentIdUserB,
         amount: CANCELLATION_POLICY.refundableCents,

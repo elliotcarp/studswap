@@ -8,14 +8,19 @@
 // again later via SwapRecapModal, see swapReview.tsx.
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   SettlementCard,
   FeeCard,
   ObligationsCard,
   StayDatesCard,
+  DepositEstimateCard,
   type ConfirmationCharge,
+  type DepositRate,
   type SettlementPreview,
 } from "./swapReview";
+import { SPRING_DEFAULT, usePrefersReducedMotion } from "@/lib/motion";
+import Button from "@/components/ui/Button";
 
 export default function ConfirmReviewModal({
   matchId,
@@ -25,6 +30,7 @@ export default function ConfirmReviewModal({
   stayTo,
   settlement,
   confirmationCharge,
+  depositRates,
   onClose,
 }: {
   matchId: string;
@@ -34,11 +40,13 @@ export default function ConfirmReviewModal({
   stayTo: string;
   settlement: SettlementPreview;
   confirmationCharge: ConfirmationCharge;
+  depositRates: DepositRate[];
   onClose: () => void;
 }) {
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reducedMotion = usePrefersReducedMotion();
 
   async function handleConfirm() {
     setBusy(true);
@@ -59,10 +67,21 @@ export default function ConfirmReviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div
+    <motion.div
+      className="glass-scrim fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={reducedMotion ? { duration: 0.15 } : SPRING_DEFAULT}
+    >
+      <motion.div
         className="scrollbar-hide max-h-[88vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
+        animate={reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+        exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
+        transition={reducedMotion ? { duration: 0.15 } : SPRING_DEFAULT}
       >
         <h2 className="font-display text-xl font-bold text-gray-900">This is it. Lock it in.</h2>
         <p className="mt-1 text-sm text-gray-500">
@@ -70,8 +89,16 @@ export default function ConfirmReviewModal({
         </p>
 
         <StayDatesCard stayFrom={stayFrom} stayTo={stayTo} />
-        <SettlementCard preview={settlement} isMePaying={isMePaying} otherUserName={otherUserName} tense="final" />
+        <SettlementCard
+          preview={settlement}
+          isMePaying={isMePaying}
+          otherUserName={otherUserName}
+          tense="final"
+          stayFrom={stayFrom}
+          stayTo={stayTo}
+        />
         <FeeCard charge={confirmationCharge} otherUserName={otherUserName} />
+        <DepositEstimateCard rates={depositRates} />
 
         <ObligationsCard otherUserName={otherUserName}>
           <label className="mt-3 flex items-start gap-2 text-xs text-gray-600">
@@ -88,23 +115,14 @@ export default function ConfirmReviewModal({
         {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-full border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
-          >
+          <Button variant="secondary" onClick={onClose} className="flex-1">
             Back
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={!agreed || busy}
-            className="flex-1 rounded-full bg-gradient-to-r from-bloom to-riviera px-4 py-3 text-sm font-medium text-white shadow-lg shadow-bloom/30 disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={handleConfirm} disabled={!agreed || busy} className="flex-1">
             {busy ? "Redirecting…" : "Confirm"}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

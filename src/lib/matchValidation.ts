@@ -13,6 +13,9 @@
 // the pricier flat.
 // PAID: the payer (paidByUserId) owes the flat owner's total stay price, at
 // the owner's listed rate or a negotiated one (negotiatedPricePerDayCentsPaid).
+//
+// A listed (never a negotiated) rate prices off pricePerMonthCents instead
+// of pricePerDayCents once the stay reaches a month — see pricing.ts.
 
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { totalStayPriceCents } from "./pricing";
@@ -41,23 +44,28 @@ export async function computeSettlement(
     const ownerId = payerId === match.userAId ? match.userBId : match.userAId;
     const owner = await tx.profile.findUnique({
       where: { userId: ownerId },
-      select: { pricePerDayCents: true },
+      select: { pricePerDayCents: true, pricePerMonthCents: true },
     });
     if (!owner) throw new Error("Flat owner's profile not found");
 
     const pricePerDay = match.negotiatedPricePerDayCentsPaid ?? owner.pricePerDayCents;
-    const total = totalStayPriceCents(pricePerDay, match.stayFrom, match.stayTo);
+    // A negotiated day rate is an explicit override — apply it literally,
+    // never reinterpreted via the monthly rate (see pricing.ts).
+    const pricePerMonth = match.negotiatedPricePerDayCentsPaid != null ? null : owner.pricePerMonthCents;
+    const total = totalStayPriceCents(pricePerDay, match.stayFrom, match.stayTo, pricePerMonth);
     return { settlementAmountCents: total, settlementPayerId: payerId };
   }
 
   const [profileA, profileB] = await Promise.all([
-    tx.profile.findUnique({ where: { userId: match.userAId }, select: { pricePerDayCents: true } }),
-    tx.profile.findUnique({ where: { userId: match.userBId }, select: { pricePerDayCents: true } }),
+    tx.profile.findUnique({ where: { userId: match.userAId }, select: { pricePerDayCents: true, pricePerMonthCents: true } }),
+    tx.profile.findUnique({ where: { userId: match.userBId }, select: { pricePerDayCents: true, pricePerMonthCents: true } }),
   ]);
   const rateA = match.negotiatedPricePerDayCentsUserA ?? profileA?.pricePerDayCents ?? null;
   const rateB = match.negotiatedPricePerDayCentsUserB ?? profileB?.pricePerDayCents ?? null;
-  const totalA = rateA != null ? totalStayPriceCents(rateA, match.stayFrom, match.stayTo) : 0;
-  const totalB = rateB != null ? totalStayPriceCents(rateB, match.stayFrom, match.stayTo) : 0;
+  const monthlyA = match.negotiatedPricePerDayCentsUserA != null ? null : profileA?.pricePerMonthCents ?? null;
+  const monthlyB = match.negotiatedPricePerDayCentsUserB != null ? null : profileB?.pricePerMonthCents ?? null;
+  const totalA = rateA != null ? totalStayPriceCents(rateA, match.stayFrom, match.stayTo, monthlyA) : 0;
+  const totalB = rateB != null ? totalStayPriceCents(rateB, match.stayFrom, match.stayTo, monthlyB) : 0;
   const diff = totalA - totalB;
   // The side whose OWN flat is worth more is owed the difference: the other
   // side occupies that pricier flat while only offering their cheaper one

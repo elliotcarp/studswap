@@ -6,9 +6,7 @@ import { authOptions } from "@/lib/auth";
 import {
   ACCOMMODATES_OPTIONS,
   MAX_SELF_PHOTO_COUNT,
-  MIN_SELF_PHOTO_COUNT,
   MAX_FLAT_PHOTO_COUNT,
-  MIN_FLAT_PHOTO_COUNT,
   accommodatesLabelToInt,
 } from "@/lib/onboardingOptions";
 import { EUROPEAN_CITIES } from "@/lib/cities";
@@ -46,18 +44,30 @@ const profileSchema = z
       .int()
       .min(100, "Set a price of at least €1/day")
       .max(100000, "€1000/day max"),
+    // Optional: empty string (not set) is valid, but a non-empty value must
+    // be a real price. Never required — long stays are the exception, not
+    // the norm, and this never feeds settlement math (see schema comment).
+    pricePerMonthCents: z
+      .string()
+      .trim()
+      .optional()
+      .transform((v) => (v ? Number(v) : null))
+      .refine((v) => v === null || (Number.isInteger(v) && v >= 100 && v <= 2000000), {
+        message: "Enter a valid monthly price",
+      }),
     smoker: z.string().trim().min(1),
     pets: z.string().trim().min(1),
     // Relative paths (local disk storage, e.g. "/uploads/xyz.png") as well as
     // absolute URLs (Vercel Blob in prod) are valid, so just require non-empty.
-    selfPhotoUrls: z
-      .array(z.string().min(1))
-      .min(MIN_SELF_PHOTO_COUNT, `Add at least ${MIN_SELF_PHOTO_COUNT} photos of you`)
-      .max(MAX_SELF_PHOTO_COUNT),
-    flatPhotoUrls: z
-      .array(z.string().min(1))
-      .min(MIN_FLAT_PHOTO_COUNT, `Add at least ${MIN_FLAT_PHOTO_COUNT} photos of the flat`)
-      .max(MAX_FLAT_PHOTO_COUNT),
+    // Onboarding's photo steps are skippable (see OnboardingWizard.tsx) —
+    // MIN_SELF_PHOTO_COUNT/MIN_FLAT_PHOTO_COUNT are shown there as guidance
+    // (backed by ProfileCompletionBanner's ongoing reminder), not enforced
+    // here, so a profile can be created or edited with zero photos.
+    selfPhotoUrls: z.array(z.string().min(1)).max(MAX_SELF_PHOTO_COUNT),
+    flatPhotoUrls: z.array(z.string().min(1)).max(MAX_FLAT_PHOTO_COUNT),
+    // Optional: a single Blob URL, uploaded client-side (see
+    // /api/upload/video). Empty string means no video.
+    flatVideoUrl: z.string().trim().max(2000).optional(),
     // Not required here: the onboarding wizard already gates non-empty entry
     // client-side before letting a new profile advance past that step, but
     // requiring it again on every save would block editing any other field
@@ -68,6 +78,16 @@ const profileSchema = z
       .array(promptSchema)
       .min(MIN_PROMPT_COUNT, `Answer at least ${MIN_PROMPT_COUNT} prompts`)
       .max(MAX_PROMPT_COUNT),
+    // Short-term rental registration number (EU 2024/1028) — collected at
+    // listing creation because any listing could end up as a one-directional
+    // stay. Not required here, same reasoning as selfDescription/
+    // flatDescription above: requiring it on every save would block editing
+    // any other field for accounts that predate this field. The onboarding
+    // wizard enforces "a number, or exempt" client-side for new profiles
+    // (see OnboardingWizard.tsx) since that's the actual "listing creation"
+    // moment the brief means.
+    shortTermRentalRegistrationNumber: z.string().trim().max(100),
+    shortTermRentalRegistrationExempt: z.boolean(),
   })
   .refine((data) => data.availableTo > data.availableFrom, {
     message: "Available to must be after available from",
@@ -107,13 +127,17 @@ export async function POST(request: Request) {
     availableTo,
     accommodates,
     pricePerDayCents,
+    pricePerMonthCents,
     smoker,
     pets,
     selfPhotoUrls,
     flatPhotoUrls,
+    flatVideoUrl,
     selfDescription,
     flatDescription,
     prompts,
+    shortTermRentalRegistrationNumber,
+    shortTermRentalRegistrationExempt,
   } = parsed.data;
 
   const data = {
@@ -128,13 +152,17 @@ export async function POST(request: Request) {
     availableTo,
     accommodates: accommodatesLabelToInt(accommodates),
     pricePerDayCents,
+    pricePerMonthCents,
     smoker,
     pets,
     selfPhotoUrls: JSON.stringify(selfPhotoUrls),
     flatPhotoUrls: JSON.stringify(flatPhotoUrls),
+    flatVideoUrl: flatVideoUrl || null,
     selfDescription,
     flatDescription,
     prompts: JSON.stringify(prompts),
+    shortTermRentalRegistrationNumber: shortTermRentalRegistrationNumber || null,
+    shortTermRentalRegistrationExempt,
   };
 
   await prisma.profile.upsert({
@@ -156,6 +184,8 @@ export async function POST(request: Request) {
 //   minOverlapDays    : how many days the candidate's availability must
 //                       overlap with tripFrom/tripTo to count as a match
 //   minAccommodates   : candidate's flat must fit at least this many people
+// Results are ranked best-match-first: longest date overlap with
+// tripFrom/tripTo wins, newest profile breaks ties.
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as { id?: string } | undefined)?.id;
@@ -192,21 +222,41 @@ export async function GET(request: Request) {
     take: 100,
   });
 
-  const filtered = profiles.filter((p) => {
-    if (city && p.homeCity !== city) return false;
-    if (minAccommodates && p.accommodates < minAccommodates) return false;
-
+  // Computed once per candidate so both the filter and the ranking below use
+  // the same number: negative when the ranges don't overlap at all, so it
+  // still separates "close to your dates" from "nowhere near your dates"
+  // among candidates that pass the filter untouched (minOverlapDays === 0).
+  const withOverlap = profiles.map((p) => {
+    let overlapDays = -Infinity;
     if (hasValidTripRange) {
       const overlapStartMs = Math.max(p.availableFrom.getTime(), tripFrom!.getTime());
       const overlapEndMs = Math.min(p.availableTo.getTime(), tripTo!.getTime());
-      const overlapDays = (overlapEndMs - overlapStartMs) / (1000 * 60 * 60 * 24);
-      if (overlapDays < minOverlapDays) return false;
+      overlapDays = (overlapEndMs - overlapStartMs) / (1000 * 60 * 60 * 24);
     }
+    return { profile: p, overlapDays };
+  });
+
+  const filtered = withOverlap.filter(({ profile: p, overlapDays }) => {
+    if (city && p.homeCity !== city) return false;
+    if (minAccommodates && p.accommodates < minAccommodates) return false;
+
+    // Only exclude on date mismatch if the viewer explicitly asked for a
+    // minimum overlap (see FilterPanel.tsx) — dates not lining up shouldn't
+    // by itself hide a candidate, since swap dates are negotiated in chat
+    // after matching, not locked in before it (see /api/matches/[id]/propose).
+    if (hasValidTripRange && minOverlapDays > 0 && overlapDays < minOverlapDays) return false;
 
     return true;
   });
 
-  const results: ProfileCardData[] = filtered.map((p) => toProfileCardData(p.userId, p));
+  // Best matches first: longest date overlap with the viewer's trip window,
+  // then newest profile as a tiebreak (and as the fallback ordering when
+  // there's no trip range to compare against).
+  filtered.sort(
+    (a, b) => b.overlapDays - a.overlapDays || b.profile.createdAt.getTime() - a.profile.createdAt.getTime()
+  );
+
+  const results: ProfileCardData[] = filtered.map(({ profile: p }) => toProfileCardData(p.userId, p));
 
   return NextResponse.json({ profiles: results });
 }

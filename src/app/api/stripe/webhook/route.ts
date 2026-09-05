@@ -3,18 +3,11 @@ import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { computeSettlement } from "@/lib/matchValidation";
-import { processPendingPayoutsForUser } from "@/lib/stripeConnect";
 
-// POST: Stripe webhook endpoint.
-// - checkout.session.completed for a confirmation charge is the only
-//   trustworthy signal that a side has actually paid their €25 (never the
-//   client-side redirect back to success_url, which anyone could hit
-//   directly without paying).
-// - account.updated fires whenever a connected account's status changes —
-//   used to detect the moment a user's Connect Express onboarding actually
-//   completes (payouts_enabled flips true), so any forfeiture payouts
-//   they're owed can be sent immediately instead of waiting for them to
-//   revisit the app.
+// POST: Stripe webhook endpoint. checkout.session.completed for a
+// confirmation charge is the only trustworthy signal that a side has
+// actually paid their €25 (never the client-side redirect back to
+// success_url, which anyone could hit directly without paying).
 // Verifies the signature so only Stripe itself can trigger this. Idempotent:
 // a webhook can be delivered more than once for the same event, so this
 // only marks a side confirmed once and no-ops if it's already set.
@@ -87,24 +80,30 @@ export async function POST(request: Request) {
         negotiatedPricePerDayCentsUserB: match.negotiatedPricePerDayCentsUserB,
       });
 
+      // Freeze each side's current payment destination into the match right
+      // as it validates, so an edit to User.paymentHandle afterward can
+      // never change what the counterpart was shown for this arrangement —
+      // see the Match model comment.
+      const [userA, userB] = await Promise.all([
+        tx.user.findUnique({ where: { id: match.userAId }, select: { paymentMethod: true, paymentHandle: true, paymentHandleAccountName: true } }),
+        tx.user.findUnique({ where: { id: match.userBId }, select: { paymentMethod: true, paymentHandle: true, paymentHandleAccountName: true } }),
+      ]);
+
       await tx.match.update({
         where: { id: matchId },
-        data: { status: "VALIDATED", settlementAmountCents, settlementPayerId },
+        data: {
+          status: "VALIDATED",
+          settlementAmountCents,
+          settlementPayerId,
+          paymentMethodSnapshotUserA: userA?.paymentMethod ?? null,
+          paymentHandleSnapshotUserA: userA?.paymentHandle ?? null,
+          paymentHandleAccountNameSnapshotUserA: userA?.paymentHandleAccountName ?? null,
+          paymentMethodSnapshotUserB: userB?.paymentMethod ?? null,
+          paymentHandleSnapshotUserB: userB?.paymentHandle ?? null,
+          paymentHandleAccountNameSnapshotUserB: userB?.paymentHandleAccountName ?? null,
+        },
       });
     });
-  }
-
-  if (event.type === "account.updated") {
-    const account = event.data.object as Stripe.Account;
-    const payoutsEnabled = Boolean(account.payouts_enabled);
-
-    const user = await prisma.user.findFirst({ where: { stripeConnectAccountId: account.id } });
-    if (user && user.stripeConnectPayoutsEnabled !== payoutsEnabled) {
-      await prisma.user.update({ where: { id: user.id }, data: { stripeConnectPayoutsEnabled: payoutsEnabled } });
-    }
-    if (user && payoutsEnabled) {
-      await processPendingPayoutsForUser(user.id);
-    }
   }
 
   return NextResponse.json({ received: true });

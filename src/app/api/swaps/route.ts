@@ -104,7 +104,11 @@ export async function GET() {
           markedPaidByPayer: match.settlementMarkedPaidByPayer,
           confirmedReceivedByPayee: match.settlementConfirmedReceivedByPayee,
         },
-        otherPaymentHandle: other.paymentHandle ?? null,
+        // Frozen at validation time — see Match.paymentHandleSnapshotUserA/B
+        // comment — never the live User row, so an edit afterward can't
+        // change what's shown for an already-confirmed swap.
+        otherPaymentMethod: (isUserA ? match.paymentMethodSnapshotUserB : match.paymentMethodSnapshotUserA) ?? null,
+        otherPaymentHandle: (isUserA ? match.paymentHandleSnapshotUserB : match.paymentHandleSnapshotUserA) ?? null,
         myRefundableStatus: (isUserA ? match.refundableStatusUserA : match.refundableStatusUserB) as
           | "PENDING"
           | "REFUNDED"

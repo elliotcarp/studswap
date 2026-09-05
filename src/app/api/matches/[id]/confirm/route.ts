@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { createConfirmationCheckoutSession } from "@/lib/confirmationCharge";
+import { computeSettlement } from "@/lib/matchValidation";
 
 // POST: start the €25 confirmation charge (€5 non-refundable service fee +
 // €20 refundable, refunded a day into the stay) for the current user.
@@ -37,7 +38,34 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "You've already confirmed this match" }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, paymentMethod: true, paymentHandle: true },
+  });
+
+  // Whoever is due to receive money can't confirm until they've told us how
+  // to pay them — the other side is shown this handle once VALIDATED, so it
+  // has to exist before that can happen. Computed from the currently agreed
+  // dates/prices, same math as the frozen settlement snapshot.
+  const { settlementPayerId, settlementAmountCents } = await computeSettlement(prisma, {
+    userAId: match.userAId,
+    userBId: match.userBId,
+    type: match.type,
+    paidByUserId: match.paidByUserId,
+    stayFrom: match.stayFrom,
+    stayTo: match.stayTo,
+    negotiatedPricePerDayCentsPaid: match.negotiatedPricePerDayCentsPaid,
+    negotiatedPricePerDayCentsUserA: match.negotiatedPricePerDayCentsUserA,
+    negotiatedPricePerDayCentsUserB: match.negotiatedPricePerDayCentsUserB,
+  });
+  const iAmOwedMoney = settlementAmountCents > 0 && settlementPayerId != null && settlementPayerId !== userId;
+  if (iAmOwedMoney && (!user?.paymentMethod || !user?.paymentHandle)) {
+    return NextResponse.json(
+      { error: "Add how you'd like to be paid on your profile before confirming — the other side needs it." },
+      { status: 400 }
+    );
+  }
+
   const origin = new URL(request.url).origin;
 
   try {

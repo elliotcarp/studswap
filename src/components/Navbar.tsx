@@ -67,15 +67,16 @@ export default function Navbar() {
 
   return (
     <>
-      {/* Mobile: bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex justify-around border-t bg-white py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden">
+      {/* Mobile: bottom tab bar. Translucent structural chrome (skill §12):
+          content scrolls underneath instead of stopping at an opaque strip. */}
+      <nav className="glass-nav glass-edge-top fixed bottom-0 left-0 right-0 z-30 flex justify-around py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden">
         {TABS.map((tab) => {
           const active = pathname === tab.href || pathname?.startsWith(`${tab.href}/`);
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex flex-col items-center gap-0.5 px-4 py-1 text-xs font-medium ${
+              className={`flex flex-col items-center gap-0.5 px-4 py-1 text-xs font-medium transition-transform active:scale-90 ${
                 active ? "text-chalk" : "text-gray-400"
               }`}
             >
@@ -90,7 +91,7 @@ export default function Navbar() {
       </nav>
 
       {/* Desktop: fixed left sidebar */}
-      <nav className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r bg-white p-4 md:flex">
+      <nav className="glass-nav fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-r-white/40 p-4 md:flex">
         <Link href="/" className="mb-8 px-2 font-display text-xl font-bold text-chalk">
           StudSwap
         </Link>

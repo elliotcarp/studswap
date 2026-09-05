@@ -8,9 +8,15 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import CityPicker from "@/components/CityPicker";
 import ProfileCard from "@/components/ProfileCard";
+import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
 import ChipSelect from "@/components/onboarding/ChipSelect";
 import PhotoGridEditor from "@/components/onboarding/PhotoGridEditor";
+import VideoUploader from "@/components/onboarding/VideoUploader";
 import PromptsEditor from "@/components/onboarding/PromptsEditor";
+import Surface from "@/components/ui/Surface";
+import Button from "@/components/ui/Button";
+import { Input, Textarea } from "@/components/ui/Input";
+import PaymentMethodEditor, { PaymentMethodSummary, type PaymentMethodValue } from "@/components/PaymentMethodEditor";
 import {
   YEAR_OF_STUDY_OPTIONS,
   SMOKER_OPTIONS,
@@ -92,6 +98,12 @@ const SIMPLE_FIELDS: {
     edit: (d, set) => <PriceEditor value={d.pricePerDayCents} onChange={set} />,
   },
   {
+    key: "pricePerMonthCents",
+    label: "Price per month (long stays)",
+    display: (d) => (d.pricePerMonthCents ? `€${(Number(d.pricePerMonthCents) / 100).toFixed(0)}/month` : "Not added yet"),
+    edit: (d, set) => <PriceEditor value={d.pricePerMonthCents} onChange={set} placeholder="€ per month (optional)" />,
+  },
+  {
     key: "smoker",
     label: "Smoker",
     display: (d) => d.smoker,
@@ -118,32 +130,16 @@ const SIMPLE_FIELDS: {
 ];
 
 function TextEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <input
-      autoFocus
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-    />
-  );
+  return <Input autoFocus value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function TextAreaEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <textarea
-      autoFocus
-      rows={4}
-      maxLength={1000}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-    />
-  );
+  return <Textarea autoFocus rows={4} maxLength={1000} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function AgeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <input
+    <Input
       type="number"
       autoFocus
       inputMode="numeric"
@@ -151,61 +147,69 @@ function AgeEditor({ value, onChange }: { value: string; onChange: (v: string) =
       max={99}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
     />
   );
 }
 
 // value/onChange are in cents (matches ProfileFormData.pricePerDayCents /
 // the API's cents-based schema); the input itself shows and accepts euros.
-function PriceEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+// An emptied field stays empty (not "0") so it round-trips correctly for
+// the optional pricePerMonthCents, not just the required per-day price.
+function PriceEditor({
+  value,
+  onChange,
+  placeholder = "€ per day",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   const euros = value ? String(Number(value) / 100) : "";
   return (
-    <input
+    <Input
       type="number"
       autoFocus
       inputMode="numeric"
       min={1}
       max={1000}
       value={euros}
-      onChange={(e) => onChange(String(Math.round(Number(e.target.value) * 100)))}
-      placeholder="€ per day"
-      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+      onChange={(e) => onChange(e.target.value ? String(Math.round(Number(e.target.value) * 100)) : "")}
+      placeholder={placeholder}
     />
   );
 }
 
 function DateEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <input
-      type="date"
-      autoFocus
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-    />
-  );
+  return <Input type="date" autoFocus value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 export default function ProfileView({
   initialProfile,
+  initialPaymentMethod,
   initialPaymentHandle,
+  initialPaymentHandleAccountName,
   ratingSummary,
 }: {
   initialProfile: ProfileFormData;
+  initialPaymentMethod: string;
   initialPaymentHandle: string;
+  initialPaymentHandleAccountName: string;
   ratingSummary: RatingSummary;
 }) {
   const [profile, setProfile] = useState(initialProfile);
-  const [editingKey, setEditingKey] = useState<FieldKey | "selfPhotos" | "flatPhotos" | "prompts" | "paymentHandle" | null>(
-    null
-  );
+  const [editingKey, setEditingKey] = useState<
+    FieldKey | "selfPhotos" | "flatPhotos" | "flatVideo" | "prompts" | "paymentHandle" | "registration" | null
+  >(null);
   const [draft, setDraft] = useState<ProfileFormData | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
-  const [paymentHandle, setPaymentHandle] = useState(initialPaymentHandle);
-  const [paymentHandleDraft, setPaymentHandleDraft] = useState(initialPaymentHandle);
+  const [payment, setPayment] = useState<PaymentMethodValue>({
+    paymentMethod: initialPaymentMethod,
+    paymentHandle: initialPaymentHandle,
+    paymentHandleAccountName: initialPaymentHandleAccountName,
+  });
+  const [paymentDraft, setPaymentDraft] = useState<PaymentMethodValue>(payment);
   const [savingPaymentHandle, setSavingPaymentHandle] = useState(false);
   const [paymentHandleError, setPaymentHandleError] = useState<string | null>(null);
 
@@ -216,14 +220,14 @@ export default function ProfileView({
       const res = await fetch("/api/user/payment-handle", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentHandle: paymentHandleDraft }),
+        body: JSON.stringify(paymentDraft),
       });
       if (!res.ok) {
         setPaymentHandleError("Could not save. Please try again.");
         setSavingPaymentHandle(false);
         return;
       }
-      setPaymentHandle(paymentHandleDraft);
+      setPayment(paymentDraft);
       setEditingKey(null);
     } catch {
       setPaymentHandleError("Could not save. Please try again.");
@@ -232,7 +236,7 @@ export default function ProfileView({
     }
   }
 
-  function startEditing(key: FieldKey | "selfPhotos" | "flatPhotos" | "prompts") {
+  function startEditing(key: FieldKey | "selfPhotos" | "flatPhotos" | "flatVideo" | "prompts" | "registration") {
     setDraft(profile);
     setEditingKey(key);
     setError(null);
@@ -276,16 +280,21 @@ export default function ProfileView({
   }
 
   return (
-    <main className="flex flex-col p-6 pb-24 md:ml-56 md:pb-6">
+    <main className="app-bg flex flex-col p-6 pb-24 md:ml-56 md:pb-6">
       <div className="mx-auto w-full max-w-2xl">
-      <h1 className="mb-4 font-display text-2xl font-bold">Your profile</h1>
+      <h1 className="mb-5 font-display text-3xl font-bold text-chalk">Your profile</h1>
 
-      <div className="mb-6 flex rounded-lg bg-gray-100 p-1">
+      <ProfileCompletionBanner
+        selfPhotoCount={profile.selfPhotoUrls.length}
+        flatPhotoCount={profile.flatPhotoUrls.length}
+      />
+
+      <div className="mb-6 flex rounded-full bg-white p-1 shadow-surface">
         <button
           type="button"
           onClick={() => setTab("edit")}
-          className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
-            tab === "edit" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+          className={`flex-1 rounded-full py-2 text-sm font-semibold transition-colors ${
+            tab === "edit" ? "bg-gradient-to-r from-bloom to-riviera text-white shadow-surface" : "text-carbon-text"
           }`}
         >
           Edit
@@ -293,8 +302,8 @@ export default function ProfileView({
         <button
           type="button"
           onClick={() => setTab("preview")}
-          className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
-            tab === "preview" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+          className={`flex-1 rounded-full py-2 text-sm font-semibold transition-colors ${
+            tab === "preview" ? "bg-gradient-to-r from-bloom to-riviera text-white shadow-surface" : "text-carbon-text"
           }`}
         >
           Preview
@@ -310,35 +319,29 @@ export default function ProfileView({
           />
         </div>
       ) : (
-      <>
-      {/* Payment handle: how a matched counterpart should pay you directly
+      <div className="flex flex-col gap-4">
+      {/* Payment method: how a matched counterpart should pay you directly
           once you've both confirmed — StudSwap never moves this money. */}
-      <section className="mb-6 border-b pb-4">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">How should people pay you?</span>
+      <Surface className="p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm font-semibold text-chalk">How should people pay you?</span>
           {editingKey !== "paymentHandle" && (
             <button
               type="button"
               onClick={() => {
-                setPaymentHandleDraft(paymentHandle);
+                setPaymentDraft(payment);
                 setPaymentHandleError(null);
                 setEditingKey("paymentHandle");
               }}
-              className="text-sm font-medium text-riviera"
+              className="text-sm font-semibold text-riviera"
             >
               Edit
             </button>
           )}
         </div>
         {editingKey === "paymentHandle" ? (
-          <div className="mt-2 flex flex-col gap-2">
-            <input
-              autoFocus
-              value={paymentHandleDraft}
-              onChange={(e) => setPaymentHandleDraft(e.target.value)}
-              placeholder="e.g. PayPal: you@example.com, or your IBAN"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
+          <div className="flex flex-col gap-3">
+            <PaymentMethodEditor value={paymentDraft} onChange={setPaymentDraft} autoFocus />
             <SaveCancelRow
               onSave={savePaymentHandle}
               onCancel={() => setEditingKey(null)}
@@ -347,19 +350,78 @@ export default function ProfileView({
             />
           </div>
         ) : (
-          <p className="mt-1 text-base">{paymentHandle || "Not added yet"}</p>
+          <PaymentMethodSummary
+            method={payment.paymentMethod}
+            handle={payment.paymentHandle}
+            accountName={payment.paymentHandleAccountName}
+          />
         )}
-      </section>
+      </Surface>
+
+      {/* Short-term rental registration: required (EU 2024/1028) for any
+          listing that could end up as a one-directional stay, which is any
+          listing here — so collected the same way for everyone, exempt or
+          not. Compliance data only, never shown to another user. */}
+      <Surface className="p-5">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-semibold text-chalk">Short-term rental registration</span>
+          {editingKey !== "registration" && (
+            <button
+              type="button"
+              onClick={() => startEditing("registration")}
+              className="text-sm font-semibold text-riviera"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+        {editingKey === "registration" && draft ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-carbon-text">
+              If the city your flat is in runs a short-term rental registration scheme, add the registration
+              number here. Required under EU rules if it applies to you — tick exempt if it doesn't.
+            </p>
+            <Input
+              autoFocus
+              value={draft.shortTermRentalRegistrationNumber}
+              onChange={(e) => setDraft({ ...draft, shortTermRentalRegistrationNumber: e.target.value, shortTermRentalRegistrationExempt: false })}
+              disabled={draft.shortTermRentalRegistrationExempt}
+              placeholder="Registration number"
+            />
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={draft.shortTermRentalRegistrationExempt}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    shortTermRentalRegistrationExempt: e.target.checked,
+                    shortTermRentalRegistrationNumber: e.target.checked ? "" : draft.shortTermRentalRegistrationNumber,
+                  })
+                }
+              />
+              My city doesn&apos;t require this
+            </label>
+            <SaveCancelRow onSave={save} onCancel={cancelEditing} saving={saving} error={error} />
+          </div>
+        ) : (
+          <p className="text-base">
+            {profile.shortTermRentalRegistrationExempt
+              ? "Exempt"
+              : profile.shortTermRentalRegistrationNumber || "Not added yet"}
+          </p>
+        )}
+      </Surface>
 
       {/* Photos of you */}
-      <section className="mb-6 border-b pb-4">
+      <Surface className="p-5">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">Photos of you</span>
+          <span className="text-sm font-semibold text-chalk">Photos of you</span>
           {editingKey !== "selfPhotos" && (
             <button
               type="button"
               onClick={() => startEditing("selfPhotos")}
-              className="text-sm font-medium text-riviera"
+              className="text-sm font-semibold text-riviera"
             >
               Edit
             </button>
@@ -373,6 +435,7 @@ export default function ProfileView({
               minCount={MIN_SELF_PHOTO_COUNT}
               maxCount={MAX_SELF_PHOTO_COUNT}
               markProfilePicture
+              minIsRecommended
             />
             <SaveCancelRow onSave={save} onCancel={cancelEditing} saving={saving} error={error} />
           </div>
@@ -384,22 +447,26 @@ export default function ProfileView({
             ))}
           </div>
         )}
-      </section>
+      </Surface>
 
       {/* Photos of the flat */}
-      <section className="mb-6 border-b pb-4">
+      <Surface className="p-5">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">Photos of the flat</span>
+          <span className="text-sm font-semibold text-chalk">Photos of the flat</span>
           {editingKey !== "flatPhotos" && (
             <button
               type="button"
               onClick={() => startEditing("flatPhotos")}
-              className="text-sm font-medium text-riviera"
+              className="text-sm font-semibold text-riviera"
             >
               Edit
             </button>
           )}
         </div>
+        <p className="mb-2 text-xs text-carbon-text">
+          The first photo here is the very first thing people see on your card — mark one as the cover
+          photo below to control which.
+        </p>
         {editingKey === "flatPhotos" && draft ? (
           <div className="flex flex-col gap-2">
             <PhotoGridEditor
@@ -407,6 +474,9 @@ export default function ProfileView({
               onChange={(urls) => setDraft({ ...draft, flatPhotoUrls: urls })}
               minCount={MIN_FLAT_PHOTO_COUNT}
               maxCount={MAX_FLAT_PHOTO_COUNT}
+              markProfilePicture
+              coverLabel="Cover photo"
+              minIsRecommended
             />
             <SaveCancelRow onSave={save} onCancel={cancelEditing} saving={saving} error={error} />
           </div>
@@ -418,40 +488,68 @@ export default function ProfileView({
             ))}
           </div>
         )}
-      </section>
+      </Surface>
+
+      {/* Video of the flat (optional) */}
+      <Surface className="p-5">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-semibold text-chalk">Video of the flat</span>
+          {editingKey !== "flatVideo" && (
+            <button
+              type="button"
+              onClick={() => startEditing("flatVideo")}
+              className="text-sm font-semibold text-riviera"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+        {editingKey === "flatVideo" && draft ? (
+          <div className="flex flex-col gap-2">
+            <VideoUploader value={draft.flatVideoUrl} onChange={(url) => setDraft({ ...draft, flatVideoUrl: url })} />
+            <SaveCancelRow onSave={save} onCancel={cancelEditing} saving={saving} error={error} />
+          </div>
+        ) : profile.flatVideoUrl ? (
+          <video src={profile.flatVideoUrl} controls className="aspect-video w-full rounded-lg bg-black" />
+        ) : (
+          <p className="text-base text-carbon">Not added yet</p>
+        )}
+      </Surface>
 
       {/* Simple fields */}
-      {SIMPLE_FIELDS.map((field) => (
-        <section key={field.key} className="mb-2 border-b py-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-500">{field.label}</span>
-            {editingKey !== field.key && (
-              <button
-                type="button"
-                onClick={() => startEditing(field.key)}
-                className="text-sm font-medium text-riviera"
-              >
-                Edit
-              </button>
+      <Surface className="divide-y divide-carbon-line px-5">
+        {SIMPLE_FIELDS.map((field) => (
+          <div key={field.key} className="py-4 first:pt-5 last:pb-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-chalk">{field.label}</span>
+              {editingKey !== field.key && (
+                <button
+                  type="button"
+                  onClick={() => startEditing(field.key)}
+                  className="text-sm font-semibold text-riviera"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            {editingKey === field.key && draft ? (
+              <div className="mt-2 flex flex-col gap-2">
+                {field.edit(draft, (value) => setDraft({ ...draft, [field.key]: value }))}
+                <SaveCancelRow onSave={save} onCancel={cancelEditing} saving={saving} error={error} />
+              </div>
+            ) : (
+              <p className="mt-1 text-base">{field.display(profile)}</p>
             )}
           </div>
-          {editingKey === field.key && draft ? (
-            <div className="mt-2 flex flex-col gap-2">
-              {field.edit(draft, (value) => setDraft({ ...draft, [field.key]: value }))}
-              <SaveCancelRow onSave={save} onCancel={cancelEditing} saving={saving} error={error} />
-            </div>
-          ) : (
-            <p className="mt-1 text-base">{field.display(profile)}</p>
-          )}
-        </section>
-      ))}
+        ))}
+      </Surface>
 
       {/* Prompts */}
-      <section className="mb-6 mt-4">
+      <Surface className="p-5">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">Profile answers</span>
+          <span className="text-sm font-semibold text-chalk">Profile answers</span>
           {editingKey !== "prompts" && (
-            <button type="button" onClick={() => startEditing("prompts")} className="text-sm font-medium text-riviera">
+            <button type="button" onClick={() => startEditing("prompts")} className="text-sm font-semibold text-riviera">
               Edit
             </button>
           )}
@@ -464,24 +562,20 @@ export default function ProfileView({
         ) : (
           <div className="flex flex-col gap-3">
             {profile.prompts.map((p) => (
-              <div key={p.question} className="rounded-xl border border-gray-200 p-3">
+              <div key={p.question} className="rounded-xl bg-gray-50 p-3">
                 <p className="text-sm font-medium text-gray-500">{p.question}</p>
                 <p className="mt-1 text-base">{p.answer}</p>
               </div>
             ))}
           </div>
         )}
-      </section>
+      </Surface>
 
-      <button
-        type="button"
-        onClick={() => signOut({ callbackUrl: "/" })}
-        className="mt-6 rounded-lg border border-red-500 px-4 py-3 text-sm font-medium text-red-600"
-      >
+      <Button variant="danger" className="mt-2 !rounded-xl" onClick={() => signOut({ callbackUrl: "/" })}>
         Log out
-      </button>
+      </Button>
 
-      <section className="mt-6 overflow-hidden rounded-2xl border border-gray-200">
+      <Surface className="overflow-hidden">
         <p className="bg-gray-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
           Legal documents
         </p>
@@ -490,14 +584,14 @@ export default function ProfileView({
             key={link.href}
             href={link.href}
             target="_blank"
-            className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+            className="flex items-center justify-between border-t border-carbon-line px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
           >
             {link.label}
             <span className="text-gray-300">›</span>
           </Link>
         ))}
-      </section>
-      </>
+      </Surface>
+      </div>
       )}
       </div>
     </main>
@@ -506,6 +600,7 @@ export default function ProfileView({
 
 const LEGAL_LINKS = [
   { href: "/terms", label: "Terms of Service" },
+  { href: "/fees", label: "Fees and Refunds Policy" },
   { href: "/peer-agreement", label: "Peer Swap Agreement" },
   { href: "/privacy", label: "Privacy Policy" },
 ];
@@ -525,17 +620,12 @@ function SaveCancelRow({
     <div className="flex flex-col gap-2">
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saving}
-        className="rounded-lg bg-riviera px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {saving ? "Saving…" : "Save"}
-      </button>
-      <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-500">
-        Cancel
-      </button>
+        <Button onClick={onSave} disabled={saving} className="!px-4 !py-2 text-sm">
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button variant="ghost" onClick={onCancel} className="!px-4 !py-2 text-sm">
+          Cancel
+        </Button>
       </div>
     </div>
   );

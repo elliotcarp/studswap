@@ -19,7 +19,7 @@ export default async function ProfilePage() {
 
   const profile = await prisma.profile.findUnique({
     where: { userId },
-    include: { user: { select: { paymentHandle: true } } },
+    include: { user: { select: { paymentMethod: true, paymentHandle: true, paymentHandleAccountName: true } } },
   });
   if (!profile) {
     redirect("/onboarding");
@@ -37,13 +37,17 @@ export default async function ProfilePage() {
     availableTo: profile.availableTo.toISOString().slice(0, 10),
     accommodates: accommodatesIntToLabel(profile.accommodates),
     pricePerDayCents: String(profile.pricePerDayCents),
+    pricePerMonthCents: profile.pricePerMonthCents != null ? String(profile.pricePerMonthCents) : "",
     smoker: profile.smoker,
     pets: profile.pets,
     selfPhotoUrls: JSON.parse(profile.selfPhotoUrls),
     flatPhotoUrls: JSON.parse(profile.flatPhotoUrls),
+    flatVideoUrl: profile.flatVideoUrl ?? "",
     selfDescription: profile.selfDescription ?? "",
     flatDescription: profile.flatDescription ?? "",
     prompts: JSON.parse(profile.prompts),
+    shortTermRentalRegistrationNumber: profile.shortTermRentalRegistrationNumber ?? "",
+    shortTermRentalRegistrationExempt: profile.shortTermRentalRegistrationExempt,
   };
 
   const ratingSummary: RatingSummary = {
@@ -59,7 +63,9 @@ export default async function ProfilePage() {
     <>
       <ProfileView
         initialProfile={initialProfile}
+        initialPaymentMethod={profile.user.paymentMethod ?? ""}
         initialPaymentHandle={profile.user.paymentHandle ?? ""}
+        initialPaymentHandleAccountName={profile.user.paymentHandleAccountName ?? ""}
         ratingSummary={ratingSummary}
       />
       <Navbar />

@@ -3,10 +3,21 @@
 // Photo grid, Hinge-style ("Pair your photos and videos with prompts").
 // Shows existing photos plus a single trailing "+" tile (rather than
 // pre-rendering every remaining empty slot) since the range is wide.
-// Uploads go to /api/upload (local disk storage in dev); parent only cares
-// about the final list of photo URLs.
+// Uploads go to /api/upload (Vercel Blob storage), after being resized/
+// re-encoded client-side (see resizeImage.ts). Parent only cares about the
+// final list of photo URLs.
+//
+// Reordering is real drag-and-drop (skill §2: direct manipulation, 1:1
+// tracking), built on Framer Motion's Reorder.Group/Item — the same
+// pointer-driven drag engine SwipeCardStack uses, just the list-reorder
+// flavor of it, with sibling tiles reflowing via spring `layout`
+// animations as a dragged tile crosses them. The "Make profile picture"
+// button stays alongside drag (not replaced by it) so promoting a photo to
+// the first slot is still reachable without a pointer gesture.
 
 import { useRef, useState } from "react";
+import { Reorder } from "framer-motion";
+import { resizeImageFile } from "@/lib/resizeImage";
 
 interface Photo {
   id: string;
@@ -20,14 +31,23 @@ export default function PhotoGridEditor({
   minCount,
   maxCount,
   markProfilePicture = false,
+  coverLabel = "Profile picture",
+  minIsRecommended = false,
 }: {
   photoUrls: string[];
   onChange: (urls: string[]) => void;
   minCount: number;
   maxCount: number;
-  // Labels the first photo as "Profile picture" and lets others be promoted
-  // into that slot, only meaningful for the "photos of you" grid.
+  // Labels the first photo and lets others be promoted into that slot —
+  // "Profile picture" for the "photos of you" grid, "Cover photo" for the
+  // "photos of the flat" grid, since that one now leads the card (see
+  // ProfileCard.tsx).
   markProfilePicture?: boolean;
+  coverLabel?: string;
+  // Onboarding's photo steps are skippable (see OnboardingWizard.tsx), so
+  // minCount there is no longer enforced — show it as guidance, not a
+  // requirement.
+  minIsRecommended?: boolean;
 }) {
   const nextId = useRef(0);
   const [photos, setPhotos] = useState<Photo[]>(
@@ -55,8 +75,18 @@ export default function PhotoGridEditor({
       });
 
       try {
+        // Resize/re-encode before upload: normalizes phone photos (which
+        // can be an unsupported format like HEIC, or bigger than the
+        // server accepts) to a JPEG that reliably clears both checks.
+        let resized: File;
+        try {
+          resized = await resizeImageFile(file);
+        } catch {
+          throw new Error(`Couldn't read "${file.name}" — try a JPEG, PNG, or screenshot of it instead.`);
+        }
+
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", resized);
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         if (!res.ok) throw new Error("Upload failed");
         const data = await res.json();
@@ -65,8 +95,8 @@ export default function PhotoGridEditor({
           onChange(next.filter((p) => !p.uploading).map((p) => p.url));
           return next;
         });
-      } catch {
-        setError("One of your photos failed to upload. Please try again.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "One of your photos failed to upload. Please try again.");
         setPhotos((prev) => {
           const next = prev.filter((p) => p.id !== id);
           onChange(next.filter((p) => !p.uploading).map((p) => p.url));
@@ -93,48 +123,62 @@ export default function PhotoGridEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-3 gap-2">
-        {photos.map((photo, index) => (
-          <div
-            key={photo.id}
-            className="relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100"
-          >
-            {photo.uploading ? (
-              <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
-                Uploading…
-              </div>
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photo.url} alt="" className="h-full w-full object-cover" />
-            )}
-            {!photo.uploading && markProfilePicture && index === 0 && (
-              <span className="absolute bottom-1 left-1 rounded-full bg-riviera px-2 py-0.5 text-[10px] font-medium text-white">
-                Profile picture
-              </span>
-            )}
-            {!photo.uploading && markProfilePicture && index !== 0 && (
-              <button
-                type="button"
-                onClick={() => makeProfilePicture(photo.id)}
-                className="absolute bottom-1 left-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white"
-              >
-                Make profile picture
-              </button>
-            )}
-            {!photo.uploading && (
-              <button
-                type="button"
-                onClick={() => removePhoto(photo.id)}
-                aria-label="Remove photo"
-                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-sm text-white"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
+      <div className="flex flex-wrap gap-2">
+        <Reorder.Group
+          as="div"
+          axis="x"
+          values={photos}
+          onReorder={emit}
+          className="contents"
+        >
+          {photos.map((photo, index) => (
+            <Reorder.Item
+              key={photo.id}
+              value={photo}
+              as="div"
+              // Uploading tiles aren't draggable yet — nothing to reorder
+              // until the URL exists — but still render in place.
+              dragListener={!photo.uploading}
+              whileDrag={{ scale: 1.05, zIndex: 1, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}
+              className="relative aspect-square w-[calc((100%-1rem)/3)] cursor-grab touch-none overflow-hidden rounded-lg border border-gray-200 bg-gray-100 active:cursor-grabbing"
+            >
+              {photo.uploading ? (
+                <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                  Uploading…
+                </div>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photo.url} alt="" className="h-full w-full object-cover" draggable={false} />
+              )}
+              {!photo.uploading && markProfilePicture && index === 0 && (
+                <span className="absolute bottom-1 left-1 rounded-full bg-riviera px-2 py-0.5 text-[10px] font-medium text-white">
+                  {coverLabel}
+                </span>
+              )}
+              {!photo.uploading && markProfilePicture && index !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => makeProfilePicture(photo.id)}
+                  className="absolute bottom-1 left-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white"
+                >
+                  Make {coverLabel.toLowerCase()}
+                </button>
+              )}
+              {!photo.uploading && (
+                <button
+                  type="button"
+                  onClick={() => removePhoto(photo.id)}
+                  aria-label="Remove photo"
+                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-sm text-white"
+                >
+                  ×
+                </button>
+              )}
+            </Reorder.Item>
+          ))}
+        </Reorder.Group>
         {canAddMore && (
-          <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border border-dashed border-gray-300 text-2xl text-gray-300">
+          <label className="flex aspect-square w-[calc((100%-1rem)/3)] cursor-pointer items-center justify-center rounded-lg border border-dashed border-gray-300 text-2xl text-gray-300 transition-transform active:scale-95">
             +
             <input
               type="file"
@@ -150,7 +194,7 @@ export default function PhotoGridEditor({
         )}
       </div>
       <p className="text-xs text-gray-400">
-        {photos.length} added (min {minCount}, up to {maxCount})
+        {photos.length} added ({minIsRecommended ? "recommended" : "min"} {minCount}, up to {maxCount})
       </p>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>

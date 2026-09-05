@@ -1,13 +1,14 @@
 import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
+import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-// Local dev photo storage: saves the uploaded file under public/uploads and
-// returns a URL served directly by Next.js. Swap this out for the Vercel Blob
-// client-upload flow (see README) when deploying.
+// Photo storage via Vercel Blob (public access, since profile/flat photos
+// are shown to matched/prospective counterparts). Writing to the local
+// filesystem, as this route used to, doesn't work once deployed: Vercel's
+// serverless functions run on a read-only filesystem, so every upload
+// silently failed in production.
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_SIZE_BYTES = 8 * 1024 * 1024;
 
@@ -30,13 +31,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "File too large (max 8MB)" }, { status: 400 });
   }
 
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadsDir, { recursive: true });
-
   const ext = file.type.split("/")[1];
   const filename = `${randomUUID()}.${ext}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadsDir, filename), bytes);
+  const blob = await put(filename, file, {
+    access: "public",
+    token: process.env.PHOTOS_READ_WRITE_TOKEN,
+  });
 
-  return NextResponse.json({ url: `/uploads/${filename}` });
+  return NextResponse.json({ url: blob.url });
 }

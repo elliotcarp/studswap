@@ -82,8 +82,17 @@ export default function ChatView({
   return (
     <main className="flex h-screen justify-center bg-gray-50">
     <div className="flex h-full w-full max-w-2xl flex-col bg-white md:shadow-sm">
-      <header className="flex items-center gap-2 border-b p-4">
-        <Link href="/matches" aria-label="Back to matches" className="text-xl">
+      {/* Translucent material (skill §12) with a soft fade at the bottom
+          edge instead of a hard 1px border. Not position:sticky — this
+          header already sits outside the messages list's own scroll
+          container (only that list scrolls, see below), so it never
+          scrolls away in the first place. */}
+      <header className="glass-sheet glass-edge-fade-bottom flex items-center gap-2 p-4">
+        <Link
+          href="/matches"
+          aria-label="Back to matches"
+          className="text-xl transition-transform active:scale-90"
+        >
           ←
         </Link>
         <Link href={`/profile/${otherUserId}`} className="min-w-0 flex-1 truncate text-lg font-semibold">
@@ -156,7 +165,7 @@ export default function ChatView({
             <button
               type="submit"
               disabled={!draft.trim() || sending}
-              className="rounded-full bg-riviera px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+              className="rounded-full bg-riviera px-4 py-2 text-sm font-medium text-white transition-transform active:scale-95 disabled:opacity-40"
             >
               Send
             </button>

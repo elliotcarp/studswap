@@ -10,6 +10,8 @@ import Link from "next/link";
 import type { SwapSummary } from "@/types";
 import { ArrowRightLeftIcon } from "@/components/icons";
 import { SwapCardSkeleton } from "@/components/Skeleton";
+import { paymentMethodLabel } from "@/components/PaymentMethodEditor";
+import Button from "@/components/ui/Button";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -19,22 +21,28 @@ function formatEuros(cents: number) {
   return `€${(cents / 100).toFixed(0)}`;
 }
 
+function stayDurationDays(stayFrom: string, stayTo: string) {
+  const ms = new Date(stayTo).getTime() - new Date(stayFrom).getTime();
+  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
+}
+
 // StudSwap never moves this money — it's calculated and shown only, the two
 // of you settle it directly between yourselves (see swap.otherPaymentHandle).
 function settlementLine(swap: SwapSummary) {
   const name = swap.otherUser.name;
   const amount = formatEuros(swap.settlement.amountCents);
+  const nights = stayDurationDays(swap.stayFrom, swap.stayTo);
   if (swap.settlement.direction === "none") {
     return swap.matchType === "PAID" ? `${name} stayed at your flat, nothing owed.` : "Same value on both sides, nothing owed.";
   }
   if (swap.settlement.direction === "paid") {
     return swap.matchType === "PAID"
-      ? `You owe ${name} ${amount} for the stay at their flat.`
-      : `You owe ${name} ${amount} in fairness difference.`;
+      ? `You owe ${name} ${amount} for the ${nights}-night stay at their flat.`
+      : `You owe ${name} ${amount} in fairness difference for the ${nights}-night stay.`;
   }
   return swap.matchType === "PAID"
-    ? `${name} owes you ${amount} for the stay at your flat.`
-    : `${name} owes you ${amount} in fairness difference.`;
+    ? `${name} owes you ${amount} for the ${nights}-night stay at your flat.`
+    : `${name} owes you ${amount} in fairness difference for the ${nights}-night stay.`;
 }
 
 export default function SwapsView() {
@@ -52,10 +60,10 @@ export default function SwapsView() {
   }, []);
 
   return (
-    <main className="flex flex-col p-6 pb-24 md:ml-56 md:pb-6">
+    <main className="app-bg flex flex-col p-6 pb-24 md:ml-56 md:pb-6">
       <div className="mx-auto w-full max-w-2xl">
-        <h1 className="mb-1 font-display text-2xl font-bold">Your swaps</h1>
-        <p className="mb-4 text-sm text-gray-500">Confirmed swaps, with what's owed and who to reach.</p>
+        <h1 className="mb-1 font-display text-3xl font-bold text-chalk">Your swaps</h1>
+        <p className="mb-5 text-sm text-gray-500">Confirmed swaps, with what's owed and who to reach.</p>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -68,8 +76,8 @@ export default function SwapsView() {
         )}
 
         {swaps?.length === 0 && (
-          <div className="flex flex-col items-center gap-4 rounded-3xl bg-gradient-to-br from-riviera/10 via-bloom/5 to-spritz/10 px-6 py-20 text-center">
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-bloom to-riviera shadow-lg shadow-bloom/30">
+          <div className="flex flex-col items-center gap-4 rounded-card bg-gradient-to-br from-riviera/10 via-bloom/5 to-spritz/10 px-6 py-20 text-center shadow-surface">
+            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-bloom to-riviera shadow-elevated">
               <ArrowRightLeftIcon className="h-10 w-10 text-white" />
             </span>
             <div>
@@ -78,18 +86,15 @@ export default function SwapsView() {
                 Once you and a match agree on dates and both confirm, the swap and its details show up here.
               </p>
             </div>
-            <Link
-              href="/swipe"
-              className="mt-1 rounded-full bg-gradient-to-r from-bloom to-riviera px-6 py-2.5 text-sm font-medium text-white shadow-lg shadow-bloom/30"
-            >
-              Start swiping
+            <Link href="/swipe" className="mt-1">
+              <Button className="!px-6 !py-2.5">Start swiping</Button>
             </Link>
           </div>
         )}
 
         <ul className="flex flex-col gap-4">
           {swaps?.map((swap) => (
-            <li key={swap.matchId} className="overflow-hidden rounded-3xl border border-gray-200">
+            <li key={swap.matchId} className="overflow-hidden rounded-3xl bg-white shadow-elevated">
               <Link
                 href={`/profile/${swap.otherUser.id}`}
                 className="flex gap-3 p-4 hover:bg-gray-50"
@@ -112,7 +117,9 @@ export default function SwapsView() {
                   </p>
                   <p className="mt-1.5 text-sm text-carbon-text">{settlementLine(swap)}</p>
                   {swap.settlement.amountCents > 0 && swap.otherPaymentHandle && (
-                    <p className="mt-0.5 text-xs text-gray-400">Pay via: {swap.otherPaymentHandle}</p>
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      Pay via {paymentMethodLabel(swap.otherPaymentMethod)}: {swap.otherPaymentHandle}
+                    </p>
                   )}
                 </div>
               </Link>

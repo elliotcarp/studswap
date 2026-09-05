@@ -25,6 +25,8 @@ export default async function SwipePage() {
         defaultTripFrom={profile.availableFrom.toISOString().slice(0, 10)}
         defaultTripTo={profile.availableTo.toISOString().slice(0, 10)}
         myCity={profile.homeCity}
+        selfPhotoCount={(JSON.parse(profile.selfPhotoUrls) as string[]).length}
+        flatPhotoCount={(JSON.parse(profile.flatPhotoUrls) as string[]).length}
       />
       <Navbar />
     </>

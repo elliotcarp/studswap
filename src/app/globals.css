@@ -7,6 +7,23 @@ html, body {
   overscroll-behavior: none; /* avoid pull-to-refresh interfering with swipe gestures */
 }
 
+/* Soft brand-tinted wash for authenticated app screens (swipe, profile,
+   onboarding, matches, liked, swaps) — same color family the landing
+   page's "destinations" section already washes its background with, so
+   the app doesn't read as a disconnected flat white CRUD tool sitting
+   behind the marketing site's actual design. Fixed attachment so it
+   doesn't visibly repeat/tile as tall pages scroll. Opt-in per page
+   (applied to each screen's own root element), not the global body, so
+   pages that want a plain white/black background (landing, auth) are
+   unaffected. */
+.app-bg {
+  background-color: #fff;
+  background-image:
+    radial-gradient(1200px 600px at 100% -10%, rgba(47, 95, 240, 0.07), transparent),
+    radial-gradient(1000px 500px at -10% 100%, rgba(255, 79, 147, 0.06), transparent);
+  background-attachment: fixed;
+}
+
 html {
   /* Always reserve the scrollbar's width, even on pages short enough not to
      need one. Without this, the centered app panel (see layout.tsx's
@@ -98,4 +115,101 @@ input, select, textarea {
   .animate-skeleton {
     animation: none;
   }
+}
+
+/* Typography: size-specific tracking/leading (see .claude/SKILL.md §15 —
+   "a fixed letter-spacing is wrong somewhere"). Keyed on the combination of
+   `.font-display` + an existing Tailwind text-size utility, so headings
+   across the app pick this up automatically without every call site
+   switching to a new class — two classes (0,2,0 specificity) beats
+   Tailwind's own single-class text-size rule (0,1,0), so line-height set
+   here wins without needing `!important`. Tightest/most negative at the
+   largest sizes, settling toward normal by text-sm. */
+.font-display.text-7xl,
+.font-display.text-6xl {
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.font-display.text-5xl,
+.font-display.text-4xl {
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.font-display.text-3xl {
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.font-display.text-2xl,
+.font-display.text-xl {
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+.font-display.text-lg {
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.font-display.text-base,
+.font-display.text-sm {
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+/* Translucent materials (see .claude/SKILL.md §12). Weight encodes
+   hierarchy: .glass-nav is the heaviest (structural chrome — sidebar,
+   bottom tab bar), .glass-sheet is lighter (floating toolbars/headers,
+   sheets), .glass-scrim is the dimming layer behind a modal *task*. Never
+   stack two of these directly on each other — legibility collapses (§12).
+   `prefers-reduced-transparency` raises opacity and drops the blur instead
+   of turning fully opaque, so the material still reads as the same layer. */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.glass-nav.glass-edge-top {
+  border-top: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.glass-sheet {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+.glass-scrim {
+  background: rgba(15, 12, 20, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-nav {
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .glass-sheet {
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .glass-scrim {
+    background: rgba(15, 12, 20, 0.75);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Scroll-edge fade instead of a hard 1px border (§12) — put this on the
+   floating chrome element itself; it masks its own bottom edge into
+   transparency so content fades under it rather than hitting a hard line. */
+.glass-edge-fade-bottom {
+  mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
 }

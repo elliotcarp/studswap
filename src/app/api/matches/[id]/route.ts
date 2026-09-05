@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { totalStayPriceCents } from "@/lib/pricing";
 import { CANCELLATION_POLICY, computeCancellationOutcome } from "@/lib/cancellationPolicy";
 import { processSwapLifecycleIfNeeded } from "@/lib/swapLifecycle";
-import { processPendingPayoutsForUser } from "@/lib/stripeConnect";
+import { settlementReminderStage } from "@/lib/settlementReminders";
 
 // GET: trip-details panel data for a match, current agreed stay dates (if
 // any), each side's confirmation/payment status, and a settlement preview.
@@ -85,11 +85,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
     ? match.negotiatedPricePerDayCentsUserB
     : match.negotiatedPricePerDayCentsUserA;
   let pricing:
-    | { kind: "PAID"; ownerPricePerDayCents: number | null; negotiatedPricePerDayCents: number | null }
+    | {
+        kind: "PAID";
+        ownerPricePerDayCents: number | null;
+        ownerPricePerMonthCents: number | null;
+        negotiatedPricePerDayCents: number | null;
+      }
     | {
         kind: "MUTUAL";
         myPricePerDayCents: number | null;
+        myPricePerMonthCents: number | null;
         otherPricePerDayCents: number | null;
+        otherPricePerMonthCents: number | null;
         myNegotiatedPricePerDayCents: number | null;
         otherNegotiatedPricePerDayCents: number | null;
       };
@@ -99,13 +106,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
     pricing = {
       kind: "PAID",
       ownerPricePerDayCents: owner.profile?.pricePerDayCents ?? null,
+      ownerPricePerMonthCents: owner.profile?.pricePerMonthCents ?? null,
       negotiatedPricePerDayCents: match.negotiatedPricePerDayCentsPaid,
     };
   } else {
     pricing = {
       kind: "MUTUAL",
       myPricePerDayCents: me.profile?.pricePerDayCents ?? null,
+      myPricePerMonthCents: me.profile?.pricePerMonthCents ?? null,
       otherPricePerDayCents: other.profile?.pricePerDayCents ?? null,
+      otherPricePerMonthCents: other.profile?.pricePerMonthCents ?? null,
       myNegotiatedPricePerDayCents,
       otherNegotiatedPricePerDayCents,
     };
@@ -124,18 +134,23 @@ export async function GET(request: Request, { params }: { params: { id: string }
       const ownerId = match.paidByUserId === match.userAId ? match.userBId : match.userAId;
       const owner = ownerId === match.userAId ? match.userA : match.userB;
       const pricePerDay = match.negotiatedPricePerDayCentsPaid ?? owner.profile?.pricePerDayCents ?? null;
+      const pricePerMonth =
+        match.negotiatedPricePerDayCentsPaid != null ? null : owner.profile?.pricePerMonthCents ?? null;
       if (pricePerDay != null) {
         settlement = {
-          amountCents: totalStayPriceCents(pricePerDay, match.stayFrom, match.stayTo),
+          amountCents: totalStayPriceCents(pricePerDay, match.stayFrom, match.stayTo, pricePerMonth),
           payerId: match.paidByUserId,
         };
       }
     } else {
       const myRate = myNegotiatedPricePerDayCents ?? me.profile?.pricePerDayCents ?? null;
       const otherRate = otherNegotiatedPricePerDayCents ?? other.profile?.pricePerDayCents ?? null;
+      const myMonthlyRate = myNegotiatedPricePerDayCents != null ? null : me.profile?.pricePerMonthCents ?? null;
+      const otherMonthlyRate =
+        otherNegotiatedPricePerDayCents != null ? null : other.profile?.pricePerMonthCents ?? null;
       if (myRate != null && otherRate != null) {
-        const myTotal = totalStayPriceCents(myRate, match.stayFrom, match.stayTo);
-        const otherTotal = totalStayPriceCents(otherRate, match.stayFrom, match.stayTo);
+        const myTotal = totalStayPriceCents(myRate, match.stayFrom, match.stayTo, myMonthlyRate);
+        const otherTotal = totalStayPriceCents(otherRate, match.stayFrom, match.stayTo, otherMonthlyRate);
         const diff = myTotal - otherTotal;
         const compensatedIsMe = diff > 0;
         settlement =
@@ -169,19 +184,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
     cancelledByMe: boolean;
     cancelledAt: string;
     daysNotice: number;
-    outcome: "REFUNDED" | "FORFEITED";
+    outcome: "REFUNDED" | "FORFEITED" | "OUR_FAULT";
     forfeitedCents: number;
-    // Only set when I'm the one owed a forfeited amount — lets the card show
-    // whether it's been sent yet (see ForfeiturePayout / stripeConnect.ts).
+    // Only set when I'm the one owed a forfeited amount — paid out by
+    // manual bank transfer, not automatically, see ForfeiturePayout model
+    // comment and /api/admin.
     myPayoutStatus: "PENDING" | "PAID" | null;
-    // True only when I'm owed a still-PENDING payout and haven't finished
-    // Stripe Connect onboarding yet — drives the "set up payouts" CTA.
-    needsPayoutOnboarding: boolean;
-    // Last time a transfer was actually attempted for this payout (success
-    // or failure) — lets the card say "we last tried at X" instead of a
-    // static message once onboarding is done but the transfer hasn't
-    // landed yet (e.g. the platform's balance hasn't settled).
-    payoutLastAttemptAt: string | null;
+    myPayoutReference: string | null;
   } | null = null;
   if (match.status === "CANCELLED") {
     const log = await prisma.cancellationLog.findFirst({
@@ -190,39 +199,37 @@ export async function GET(request: Request, { params }: { params: { id: string }
     });
     if (log) {
       let myPayoutStatus: "PENDING" | "PAID" | null = null;
-      let needsPayoutOnboarding = false;
-      let payoutLastAttemptAt: string | null = null;
+      let myPayoutReference: string | null = null;
       if (log.outcome === "FORFEITED" && log.affectedUserId === userId) {
-        // Lazy reconciliation, same pattern as swapLifecycle.ts: in case the
-        // account.updated webhook was missed, or this is a second
-        // forfeiture and the user already onboarded from the first one.
-        await processPendingPayoutsForUser(userId);
-        const [payout, freshMe] = await Promise.all([
-          prisma.forfeiturePayout.findFirst({
-            where: { matchId: match.id, recipientUserId: userId },
-            orderBy: { createdAt: "desc" },
-          }),
-          // Re-fetched, not the `me` from the top of this handler — that
-          // snapshot predates processPendingPayoutsForUser, which may have
-          // just flipped stripeConnectPayoutsEnabled via its own live check.
-          prisma.user.findUnique({ where: { id: userId }, select: { stripeConnectPayoutsEnabled: true } }),
-        ]);
+        const payout = await prisma.forfeiturePayout.findFirst({
+          where: { matchId: match.id, recipientUserId: userId },
+          orderBy: { createdAt: "desc" },
+        });
         myPayoutStatus = (payout?.status as "PENDING" | "PAID" | undefined) ?? null;
-        needsPayoutOnboarding = myPayoutStatus === "PENDING" && !freshMe?.stripeConnectPayoutsEnabled;
-        payoutLastAttemptAt = payout?.lastAttemptAt?.toISOString() ?? null;
+        myPayoutReference = payout?.paidReference ?? null;
       }
       cancellation = {
-        cancelledByMe: log.cancelledByUserId === userId,
+        // OUR_FAULT rows' cancelledByUserId isn't attributive — see the
+        // void-our-fault route comment — so this is checked first.
+        cancelledByMe: log.outcome !== "OUR_FAULT" && log.cancelledByUserId === userId,
         cancelledAt: log.cancelledAt.toISOString(),
         daysNotice: log.daysNotice,
-        outcome: log.outcome as "REFUNDED" | "FORFEITED",
+        outcome: log.outcome as "REFUNDED" | "FORFEITED" | "OUR_FAULT",
         forfeitedCents: log.refundableForfeitedCents,
         myPayoutStatus,
-        needsPayoutOnboarding,
-        payoutLastAttemptAt,
+        myPayoutReference,
       };
     }
   }
+
+  const settled = match.settlementMarkedPaidByPayer && match.settlementConfirmedReceivedByPayee;
+  const reminderStage = settlementReminderStage(now, match.stayFrom, match.settlementAmountCents, Boolean(settled));
+
+  const canReportNoShow =
+    match.status === "VALIDATED" &&
+    match.stayFrom != null &&
+    match.stayFrom <= now &&
+    match.noShowReportedByUserId == null;
 
   return NextResponse.json({
     matchId: match.id,
@@ -236,10 +243,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
     confirmedByMe,
     confirmedByOther,
     otherUserName: other.profile?.name ?? "Unknown",
-    // Only revealed once both sides have paid to confirm — StudSwap never
-    // touches this money, the two users settle it directly between
-    // themselves using whichever handle they've each set.
-    otherPaymentHandle: match.status === "VALIDATED" ? other.paymentHandle ?? null : null,
+    // Only revealed once both sides have paid to confirm, and frozen at the
+    // instant it validated (see /api/stripe/webhook) — so an edit to the
+    // other side's payment details afterward never changes what's shown
+    // here for an arrangement already confirmed.
+    otherPaymentMethod: match.status === "VALIDATED" ? (isUserA ? match.paymentMethodSnapshotUserB : match.paymentMethodSnapshotUserA) : null,
+    otherPaymentHandle: match.status === "VALIDATED" ? (isUserA ? match.paymentHandleSnapshotUserB : match.paymentHandleSnapshotUserA) : null,
+    otherPaymentHandleAccountName:
+      match.status === "VALIDATED"
+        ? isUserA
+          ? match.paymentHandleAccountNameSnapshotUserB
+          : match.paymentHandleAccountNameSnapshotUserA
+        : null,
     isPayer: match.type === "PAID" ? match.paidByUserId === userId : null,
     windowFrom: windowFrom.toISOString(),
     windowTo: windowTo.toISOString(),
@@ -248,6 +263,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
     settlementIsMePaying: settlement?.payerId === userId,
     settlementMarkedPaidByPayer: match.settlementMarkedPaidByPayer,
     settlementConfirmedReceivedByPayee: match.settlementConfirmedReceivedByPayee,
+    settlementReminderStage: reminderStage,
+    settlementDisputeReported: match.settlementDisputeReportedByUserId != null,
     confirmationCharge: {
       totalCents: CANCELLATION_POLICY.serviceFeeCents + CANCELLATION_POLICY.refundableCents,
       serviceFeeCents: CANCELLATION_POLICY.serviceFeeCents,
@@ -259,5 +276,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
     cancellation,
     completedProcessedAt: match.completedProcessedAt?.toISOString() ?? null,
     ratingWindowClosesAt: match.ratingWindowClosesAt?.toISOString() ?? null,
+    canReportNoShow,
+    noShowReported: match.noShowReportedByUserId != null,
+    noShowReportedByMe: match.noShowReportedByUserId === userId,
   });
 }

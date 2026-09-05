@@ -38,6 +38,21 @@ const config: Config = {
         sans: ["var(--font-body)", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["var(--font-data)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
+      // Two deliberate elevation levels (see src/components/ui/Surface.tsx)
+      // instead of reaching for stock shadow-sm/md/lg per call site — bigger
+      // surfaces read as "thicker" with a deeper, softer shadow (skill
+      // .claude/SKILL.md §12), small chips/pills stay at `surface`.
+      boxShadow: {
+        surface: "0 1px 2px rgba(28, 25, 38, 0.06), 0 1px 1px rgba(28, 25, 38, 0.04)",
+        elevated: "0 16px 40px -12px rgba(47, 95, 240, 0.18), 0 4px 12px rgba(28, 25, 38, 0.06)",
+      },
+      borderRadius: {
+        // Named, not just "the app happens to use rounded-2xl/3xl a lot" —
+        // `card` is the standard app-surface radius, `pill` for anything
+        // fully rounded that isn't literally `rounded-full` (kept distinct
+        // so a future radius tweak doesn't also affect true pill shapes).
+        card: "1.25rem",
+      },
     },
   },
   plugins: [],

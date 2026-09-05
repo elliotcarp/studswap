@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence } from "framer-motion";
 import type { LikerSummary, MatchSummary } from "@/types";
 import MatchReveal from "@/components/MatchReveal";
 import MatchStatusPill from "@/components/MatchStatusPill";
 import { HeartIcon } from "@/components/icons";
 import { Skeleton } from "@/components/Skeleton";
+import Surface from "@/components/ui/Surface";
+import Button from "@/components/ui/Button";
 
 const EXPLAINER_SEEN_KEY = "studswap:seenLikedExplainer";
 
@@ -91,14 +94,14 @@ export default function LikedView({ myCity }: { myCity: string }) {
   }
 
   return (
-    <main className="flex flex-col p-6 pb-24 md:ml-56 md:pb-6">
+    <main className="app-bg flex flex-col p-6 pb-24 md:ml-56 md:pb-6">
       <div className="mx-auto w-full max-w-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="font-display text-2xl font-bold">Liked you</h1>
+        <div className="mb-5 flex items-center justify-between">
+          <h1 className="font-display text-3xl font-bold text-chalk">Liked you</h1>
         </div>
 
         {showExplainer && (
-          <div className="relative mb-4 rounded-2xl border border-riviera/20 bg-riviera/5 p-4">
+          <Surface variant="tinted" className="relative mb-4 p-4">
             <button
               type="button"
               onClick={dismissExplainer}
@@ -125,7 +128,7 @@ export default function LikedView({ myCity }: { myCity: string }) {
             >
               Got it
             </button>
-          </div>
+          </Surface>
         )}
 
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
@@ -149,8 +152,8 @@ export default function LikedView({ myCity }: { myCity: string }) {
         )}
 
         {likers?.length === 0 && (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-gray-200 px-6 py-16 text-center">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-bloom/10">
+          <Surface className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-bloom/15 to-spritz/15">
               <HeartIcon className="h-8 w-8 text-bloom" />
             </span>
             <div>
@@ -159,47 +162,44 @@ export default function LikedView({ myCity }: { myCity: string }) {
                 Keep your profile fresh and check back. Anyone who likes you shows up here.
               </p>
             </div>
-          </div>
+          </Surface>
         )}
 
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-2">
           {likers?.map((liker) => {
             const busy = busyUserId === liker.userId;
             return (
-              <li key={liker.userId} className="flex items-center gap-3 rounded-xl border border-gray-200 p-3">
-                <Link href={`/profile/${liker.userId}`} className="flex min-w-0 flex-1 items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={liker.photoUrl ?? "https://placehold.co/100x100?text=?"}
-                    alt=""
-                    className="h-16 w-16 flex-shrink-0 rounded-full object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{liker.name}</p>
-                    <p className="text-sm text-gray-500">
-                      They'd pay €{(liker.pricePerDayCents / 100).toFixed(0)}/day · ~€
-                      {(liker.totalPriceCents / 100).toFixed(0)} total
-                    </p>
+              <li key={liker.userId}>
+                <Surface className="flex items-center gap-3 p-3">
+                  <Link href={`/profile/${liker.userId}`} className="flex min-w-0 flex-1 items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={liker.photoUrl ?? "https://placehold.co/100x100?text=?"}
+                      alt=""
+                      className="h-16 w-16 flex-shrink-0 rounded-full object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{liker.name}</p>
+                      <p className="text-sm text-gray-500">
+                        They'd pay €{(liker.pricePerDayCents / 100).toFixed(0)}/day · ~€
+                        {(liker.totalPriceCents / 100).toFixed(0)} total for your {liker.stayDurationDays}-night stay
+                      </p>
+                    </div>
+                  </Link>
+                  <div className="flex flex-shrink-0 flex-col gap-1.5">
+                    <Button onClick={() => likeBack(liker)} disabled={busy} className="!px-3 !py-1.5 text-xs">
+                      Like back
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => accept(liker)}
+                      disabled={busy}
+                      className="!px-3 !py-1.5 text-xs"
+                    >
+                      Accept
+                    </Button>
                   </div>
-                </Link>
-                <div className="flex flex-shrink-0 flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => likeBack(liker)}
-                    disabled={busy}
-                    className="rounded-lg bg-riviera px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                  >
-                    Like back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => accept(liker)}
-                    disabled={busy}
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-40"
-                  >
-                    Accept
-                  </button>
-                </div>
+                </Surface>
               </li>
             );
           })}
@@ -207,30 +207,32 @@ export default function LikedView({ myCity }: { myCity: string }) {
 
         {connections != null && connections.length > 0 && (
           <div className="mt-8">
-            <h2 className="mb-3 font-display text-lg font-bold">Accepted</h2>
-            <ul className="flex flex-col divide-y">
+            <h2 className="mb-3 font-display text-xl font-bold text-chalk">Accepted</h2>
+            <ul className="flex flex-col gap-2">
               {connections.map((conn) => (
-                <li key={conn.matchId} className="flex items-center gap-3 py-3">
-                  <Link href={`/profile/${conn.otherUser.id}`} className="flex-shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={conn.otherUser.photoUrl ?? "https://placehold.co/100x100?text=?"}
-                      alt=""
-                      className="h-14 w-14 rounded-full object-cover"
-                    />
-                  </Link>
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/profile/${conn.otherUser.id}`} className="flex items-center gap-2">
-                      <p className="min-w-0 truncate font-medium">{conn.otherUser.name}</p>
-                      <MatchStatusPill matchType={conn.matchType} isPayer={conn.isPayer} />
+                <li key={conn.matchId}>
+                  <Surface className="flex items-center gap-3 p-3">
+                    <Link href={`/profile/${conn.otherUser.id}`} className="flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={conn.otherUser.photoUrl ?? "https://placehold.co/100x100?text=?"}
+                        alt=""
+                        className="h-14 w-14 rounded-full object-cover"
+                      />
                     </Link>
-                    <Link href={`/matches/${conn.matchId}`} className="flex items-center gap-1.5">
-                      <p className={`truncate text-sm ${conn.unread ? "font-semibold text-gray-900" : "text-gray-500"}`}>
-                        {conn.lastMessage ?? "Say hi!"}
-                      </p>
-                      {conn.unread && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-spritz" />}
-                    </Link>
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/profile/${conn.otherUser.id}`} className="flex items-center gap-2">
+                        <p className="min-w-0 truncate font-medium">{conn.otherUser.name}</p>
+                        <MatchStatusPill matchType={conn.matchType} isPayer={conn.isPayer} />
+                      </Link>
+                      <Link href={`/matches/${conn.matchId}`} className="flex items-center gap-1.5">
+                        <p className={`truncate text-sm ${conn.unread ? "font-semibold text-gray-900" : "text-gray-500"}`}>
+                          {conn.lastMessage ?? "Say hi!"}
+                        </p>
+                        {conn.unread && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-spritz" />}
+                      </Link>
+                    </div>
+                  </Surface>
                 </li>
               ))}
             </ul>
@@ -238,16 +240,19 @@ export default function LikedView({ myCity }: { myCity: string }) {
         )}
       </div>
 
-      {match && (
-        <MatchReveal
-          matchId={match.matchId}
-          myCity={myCity}
-          otherName={match.otherName}
-          otherCity={match.otherCity}
-          matchType={match.matchType}
-          onClose={() => setMatch(null)}
-        />
-      )}
+      <AnimatePresence>
+        {match && (
+          <MatchReveal
+            key="match-reveal"
+            matchId={match.matchId}
+            myCity={myCity}
+            otherName={match.otherName}
+            otherCity={match.otherCity}
+            matchType={match.matchType}
+            onClose={() => setMatch(null)}
+          />
+        )}
+      </AnimatePresence>
     </main>
   );
 }

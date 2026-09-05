@@ -5,6 +5,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { estimateSuggestedDepositCents } from "@/lib/pricing";
 
 export type SettlementPreview = { amountCents: number; payerId: string | null } | null;
 export type ConfirmationCharge = { totalCents: number; serviceFeeCents: number; refundableCents: number };
@@ -64,24 +65,33 @@ export function StayDatesCard({ stayFrom, stayTo }: { stayFrom: string; stayTo: 
 // still need to sort out yourselves, never as money StudSwap is holding.
 export type PreviewTense = "conditional" | "final";
 
+// Appended to a price whenever one's shown, so the number is never floating
+// without the stay length it's for — null (no dates yet, e.g. an early
+// draft preview) just omits the clause rather than showing a wrong one.
+function forStayClause(days: number | null): string {
+  return days != null ? ` for your ${days}-night stay` : "";
+}
+
 export function previewLine(
   preview: SettlementPreview,
   isMePaying: boolean,
   otherUserName: string,
-  tense: PreviewTense
+  tense: PreviewTense,
+  days: number | null = null
 ): string | null {
   if (!preview || preview.amountCents <= 0 || !preview.payerId) {
     return "Same value on both sides. Nothing to settle.";
   }
   const amount = formatEuros(preview.amountCents);
+  const stay = forStayClause(days);
   if (tense === "conditional") {
     return isMePaying
-      ? `You'd owe ${otherUserName} ${amount}. Settle it directly between yourselves.`
-      : `${otherUserName} would owe you ${amount}. Settle it directly between yourselves.`;
+      ? `You'd owe ${otherUserName} ${amount}${stay}.`
+      : `${otherUserName} would owe you ${amount}${stay}.`;
   }
   return isMePaying
-    ? `You owe ${otherUserName} ${amount}. StudSwap doesn't collect or move this. Pay them directly using the payment details they've shared.`
-    : `${otherUserName} owes you ${amount}. StudSwap doesn't collect or move this. They'll pay you directly.`;
+    ? `You owe ${otherUserName} ${amount}${stay}. StudSwap doesn't collect or move this, and can't recover it if something goes wrong. Pay them directly using the payment details they've shared.`
+    : `${otherUserName} owes you ${amount}${stay}. StudSwap doesn't collect or move this, and can't recover it if something goes wrong. They'll pay you directly.`;
 }
 
 export function SettlementCard({
@@ -89,13 +99,17 @@ export function SettlementCard({
   isMePaying,
   otherUserName,
   tense = "conditional",
+  stayFrom,
+  stayTo,
 }: {
   preview: SettlementPreview;
   isMePaying: boolean;
   otherUserName: string;
   tense?: PreviewTense;
+  stayFrom: string;
+  stayTo: string;
 }) {
-  const line = previewLine(preview, isMePaying, otherUserName, tense);
+  const line = previewLine(preview, isMePaying, otherUserName, tense, stayDurationDays(stayFrom, stayTo));
   return (
     <div className="mt-3 rounded-2xl bg-gray-50 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Settlement</p>
@@ -113,8 +127,12 @@ export function FeeCard({ charge, otherUserName }: { charge: ConfirmationCharge;
       <p className="mt-1 text-sm text-gray-700">
         We charge <strong>{formatEuros(charge.totalCents)}</strong> now, but{" "}
         <strong>{formatEuros(charge.refundableCents)}</strong> comes straight back to you once your stay's
-        underway, no need to ask. The <strong>{formatEuros(charge.serviceFeeCents)}</strong> you actually
-        end up paying is StudSwap's fee for making this match happen.
+        underway, no need to ask. This is used as insurance in case of late cancellation —{" "}
+        <Link href="/fees" target="_blank" className="font-medium text-riviera underline">
+          see exactly how that works
+        </Link>
+        . The <strong>{formatEuros(charge.serviceFeeCents)}</strong> you actually end up paying is
+        StudSwap's fee for making this match happen.
       </p>
       <ul className="mt-2 space-y-1 text-xs text-gray-500">
         <li>
@@ -129,6 +147,40 @@ export function FeeCard({ charge, otherUserName }: { charge: ConfirmationCharge;
           {formatEuros(charge.refundableCents)} becomes yours. If you cancel late, yours goes to them. Exact
           terms are in the Peer Swap Agreement below.
         </li>
+      </ul>
+    </div>
+  );
+}
+
+// A rate per accommodation actually at stake — one entry for a PAID stay
+// (the owner's flat, since only the payer occupies anywhere), two for a
+// MUTUAL swap (each side occupies the other's flat, so each has its own
+// suggested figure). null rates are simply omitted, e.g. before either side
+// has typed or listed a price yet.
+export type DepositRate = { label: string; pricePerDayCents: number };
+
+export function DepositEstimateCard({ rates }: { rates: DepositRate[] }) {
+  if (rates.length === 0) return null;
+  return (
+    <div className="mt-3 rounded-2xl border border-dashed border-gray-300 bg-white/95 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+        Suggested damage deposit (optional)
+      </p>
+      <p className="mt-1 text-sm text-gray-700">
+        Not collected or held by StudSwap. If you'd both like some protection against damage, here's a
+        starting point scaled to the flat's own price — agree the actual amount (or skip it entirely)
+        directly between yourselves, e.g. using the{" "}
+        <Link href="/damage-deposit-agreement" target="_blank" className="font-medium text-riviera underline">
+          Damage Deposit Agreement template
+        </Link>
+        .
+      </p>
+      <ul className="mt-2 space-y-1 text-xs text-gray-600">
+        {rates.map((r) => (
+          <li key={r.label}>
+            • {r.label}: about <strong>{formatEuros(estimateSuggestedDepositCents(r.pricePerDayCents))}</strong>
+          </li>
+        ))}
       </ul>
     </div>
   );

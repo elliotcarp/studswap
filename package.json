@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -21,10 +22,11 @@
     "framer-motion": "11.3.8",
     "next": "14.2.5",
     "next-auth": "4.24.7",
+    "nodemailer": "^6.9.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "stripe": "^22.3.2",
-    "zod": "3.23.8"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "20.14.10",
@@ -36,6 +38,7 @@
     "postcss": "8.4.39",
     "prisma": "5.16.1",
     "tailwindcss": "3.4.6",
-    "typescript": "5.5.3"
+    "typescript": "5.5.3",
+    "vitest": "^4.1.11"
   }
 }

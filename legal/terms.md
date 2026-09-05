@@ -1,283 +1,317 @@
-# StudSwap Terms of Service (DRAFT, NOT FOR PUBLICATION)
+# StudSwap — Terms of Service
 
-**⚠️ This is a working draft, not reviewed by a lawyer.** Do not treat acceptance of this
-document inside the app as a substitute for legal review. Sections still requiring
-legal or business input are marked `[PLACEHOLDER]`. See "Notes for your lawyer
-consultation" at the end.
+**Version:** 1.0 (DRAFT — NOT FOR PUBLICATION)
+**Last updated:** [DATE] · **Effective from:** [DATE]
 
-*Adapted from an earlier draft to match what StudSwap actually does today.
-StudSwap previously ran on an internal Credits ledger; that system has been
-removed. StudSwap now charges real money directly (a flat €25 confirmation
-fee per person, see Section 6) but never touches the money the two users owe
-each other for the stay itself — that's settled directly between them,
-outside the Platform. This is a meaningfully different payments posture than
-the Credits-ledger draft this was adapted from, so it still needs a full
-lawyer pass, in particular on: whether collecting and promising to refund
-the €20 portion of the confirmation fee triggers e-money/PSD2 licensing
-obligations, and whether the "forfeited to the other party" mechanic (an
-internal manual payout, not an automatic transfer) is adequately described
-here.*
-
-## 1. What StudSwap Is
-
-StudSwap ("the Platform," "we," "us") is a matchmaking service that helps
-verified students find and arrange temporary reciprocal accommodation exchanges
-("Swaps") with other verified students, typically during university break periods.
-
-**The Platform is not:**
-- A landlord, sub-landlord, or party to any accommodation arrangement.
-- A property management, hospitality, or short-term rental company.
-- A party to the Peer Swap Agreement formed between users (see Part 2).
-- An insurer, guarantor, or provider of accommodation-related insurance.
-- A payment processor for the stay itself. See Section 6: the Platform only
-  ever charges its own €25 confirmation fee; the price difference or stay
-  cost the two users owe each other is never collected, held, or
-  transferred by the Platform.
-
-The Platform's role is limited to: verifying student status via university
-email, facilitating introductions between users, and providing tools to record
-swap terms (dates, price, confirmations). **We do not inspect, endorse,
-guarantee, or take responsibility for any flat listed on the Platform, nor for
-the conduct of any user.**
-
-`[PLACEHOLDER: lawyer to confirm this framing is sufficient given EU Digital
-Services Act intermediary obligations.]`
-
-## 2. Eligibility
-
-- Users must be currently enrolled students at a recognized university,
-  verified via a university email address on our allow-list at sign-up.
-  `[PLACEHOLDER: confirm whether email-domain verification alone is
-  sufficient representation of "verified," or whether that word should be
-  avoided/qualified in user-facing copy given it isn't an ID check.]`
-- Users must be at least `[18]` years old. `[PLACEHOLDER: confirm minimum age
-  given the jurisdictions of enrolled universities.]`
-- Users must have the legal right to occupy the flat they list (see Section 4;
-  this is critical and non-negotiable).
-- The Platform reserves the right to refuse, suspend, or terminate any account
-  at its discretion, including for suspected fraud, misrepresentation, or
-  violation of these Terms.
-
-## 3. Accounts and Verification
-
-- Users may sign in either via a one-time magic link sent to their university
-  email, or by setting a password on their account. Either way, the same
-  university-email allow-list check applies.
-- Users are responsible for the accuracy of their profile, listing
-  information, and communications.
-- Email-domain verification confirms student status only, based on a
-  maintained list of university domains. **It is not a background check,
-  identity check, safety certification, or guarantee of trustworthiness**, and
-  must not be represented as such anywhere on the Platform.
-- Users may not share, sell, or transfer their account, or set a password on
-  an account whose email they don't control.
-
-## 4. Right to List: User Representations (Critical Clause)
-
-By listing a flat, the user represents and warrants that:
-
-- They have the legal right to occupy the flat for the dates listed (as
-  tenant, subtenant with permission, or owner).
-- Their lease, housing contract, or university housing agreement **permits
-  temporary reciprocal exchange or subletting for the relevant dates**, OR
-  they have obtained explicit written permission from their landlord/
-  university housing office to do so.
-- They are solely responsible for verifying and complying with the terms of
-  their own lease, local housing law, and any university housing rules.
-- **The Platform takes no responsibility for verifying lease compliance and is
-  not liable for any consequence arising from a user's breach of their own
-  housing agreement**, including but not limited to lease termination,
-  eviction, or loss of housing deposit.
-
-`[PLACEHOLDER: this is the single most important clause in the whole document
-from a risk perspective. A lawyer needs to confirm: (a) whether this
-disclaimer meaningfully limits Platform liability, and (b) whether the
-Platform should require users to upload proof of permission (e.g., landlord
-email) before listing, which is not currently implemented.]`
-
-## 5. How Swaps Work
-
-- Users create a profile/listing (city, dates, flat details, a price-per-day
-  in euros, photos of themselves and of the flat, and a short description
-  of both).
-- Users express interest ("swipe right") on candidates; a mutual swipe
-  ("Like back") unlocks messaging as a **mutual swap**.
-- Alternatively, if someone has already liked you, you can click **Accept**
-  to open a chat directly without swiping back yourself. This creates a
-  **one-directional stay**: they'd pay, directly to you, to stay at your
-  flat (see Section 6). Either side can convert a one-directional
-  arrangement into a mutual swap later, at any point before it's finalized.
-- Once dates (and optionally a negotiated price/day) are proposed and **both**
-  parties pay the confirmation fee within the app (see Section 6), the
-  arrangement is finalized. The Platform calculates and displays, for a
-  mutual swap, any price difference between the two flats, or for a
-  one-directional stay, the full stay cost — but this amount is settled
-  directly between the two users, by whatever means they choose, never
-  through the Platform. At that point, a **Peer Swap Agreement** (Part 2
-  below) is formed directly between the two users. The Platform is not a
-  party to this agreement.
-
-## 6. The Confirmation Fee (and What the Platform Does Not Handle)
-
-- **The Platform is matchmaking only.** It calculates and displays the price
-  difference on a mutual swap, or the full stay cost on a one-directional
-  stay, and shows each user the other's self-provided payment details
-  (e.g. a bank transfer handle, PayPal address) once both sides have
-  confirmed. **The Platform never collects, holds, or transfers this
-  amount.** Whether and how it actually gets paid is between the two users;
-  the Platform has no ability to verify or recover it, and is not a party to
-  that payment.
-- **The only money the Platform charges is a flat €25 confirmation fee per
-  person**, charged when that person confirms an arrangement (dates agreed,
-  fee paid), the same amount regardless of swap type, stay length, or
-  price. Of the €25:
-  - **€5 is the Platform's service fee.** It is the Platform's revenue from
-    the moment it's charged and is **never refunded**, regardless of what
-    happens afterward.
-  - **€20 is refundable.** This amount belongs to the Platform from the
-    moment it's charged — it is **not held on the user's behalf, and is not
-    a deposit, escrow, or balance** — but the Platform makes a contractual
-    promise to refund it once the stay has been underway for a day (see
-    Section 8 for what happens instead if the payer cancels late).
-  - `[PLACEHOLDER: a lawyer should confirm whether collecting the €20
-    refundable portion, and promising to refund it, triggers e-money/PSD2
-    licensing obligations even though it's framed as the Platform's own
-    money rather than a customer-held balance.]`
-
-## 7. Damage Deposits
-
-**Not currently offered.** The Platform does not currently hold, request, or
-process any damage deposit between users. If this feature is introduced,
-this section must be rewritten to describe the actual mechanism, and a
-lawyer should review the Platform's exposure as a claims reviewer before
-launch.
-
-## 8. Cancellations
-
-Before an arrangement is finalized (both sides have paid the confirmation
-fee), either side can simply stop responding, propose different terms, or
-cancel in-app; either way, anyone who had already paid gets their €20
-refundable portion back — their €5 service fee is not refunded, same as
-after finalization.
-
-Once finalized, each side's €20 refundable portion also auto-refunds once
-the stay has been underway for a day, regardless of whether anyone cancels
-(see Section 6) — so for most stays of any real length, the refund has
-already happened well before either party would consider cancelling.
-Either party may still cancel in-app at any point before the stay ends. The
-consequence for the cancelling party's own €20 depends on whether it's
-already been refunded automatically:
-
-- **Already refunded (the stay had been underway for a day or more):**
-  nothing further happens to it — it's already back with the cancelling
-  party, and cancelling at this point doesn't claw it back.
-- **Not yet refunded, more than 7 days' notice before the agreed stay start
-  date:** it's refunded to them now, same as the automatic case.
-- **Not yet refunded, 7 days' notice or less (including after the stay
-  start date has passed but before the day-1 auto-refund would have fired):**
-  it's forfeited to the other party instead.
-
-Either way: the non-cancelling party's own €20 refundable portion is always
-refunded to them (if it hasn't been already) directly, since the stay isn't
-happening and their money was never at risk. Neither party's €5 service fee
-is ever refunded, in any scenario — it is the Platform's revenue from the
-moment it's charged.
-
-**How a forfeiture is actually paid out:** the Platform does not
-automatically transfer the forfeited €20 to the other party (it is not, at
-that moment, connected to any payment method of theirs). Instead it is
-queued internally as an amount the Platform owes that user, and paid out by
-the Platform's team directly. `[PLACEHOLDER: a lawyer should confirm this
-manual-payout mechanism, and any timeline commitment around it, is
-adequately disclosed here, and whether a maximum payout turnaround time
-should be committed to in writing.]`
-
-Every cancellation is logged (who, when, and the exact outcome) for dispute
-reference. The exact notice threshold is shown to both users before they
-confirm and may be adjusted by the Platform over time; changes apply only
-to arrangements confirmed after the change.
-
-## 9. Prohibited Conduct
-
-Users may not:
-- Misrepresent their identity, student status, or the flat listed.
-- List a flat they do not have the legal right to offer.
-- Attempt to arrange the Platform's own €25 confirmation fee outside the
-  Platform to avoid paying it.
-- Use the Platform for any stay exceeding `[X weeks]`, for permanent
-  relocation, or for any purpose other than genuine temporary student
-  accommodation exchange. `[PLACEHOLDER: set a concrete maximum stay length,
-  or confirm none is needed.]`
-- Discriminate against other users on any legally protected basis in
-  accepting or rejecting a match.
-
-## 10. Limitation of Liability
-
-To the maximum extent permitted by law:
-- The Platform is not liable for the condition of any flat, the conduct of
-  any user, disputes between users, or any loss, damage, injury, or breach of
-  a third-party agreement (e.g., a user's lease) arising from use of the
-  Platform.
-- The Platform's total liability to any user for any claim arising from use
-  of the Platform is limited to `[a fixed nominal amount, TBD with lawyer —
-  now that the Platform charges a real €25 confirmation fee per person, the
-  cap should probably be pegged to that rather than set at a purely nominal
-  figure]`.
-- Nothing in this section excludes liability that cannot be excluded under
-  applicable law (e.g., liability for fraud or gross negligence).
-
-`[PLACEHOLDER: liability caps and exclusions are jurisdiction-dependent and
-subject to consumer protection law; a lawyer must draft the actual limitation
-language.]`
-
-## 11. Indemnification
-
-Users agree to indemnify and hold the Platform harmless from claims, damages,
-or costs (including legal fees) arising from their breach of these Terms,
-their lease or housing agreement, or their conduct during a Swap.
-`[PLACEHOLDER: confirm enforceability against consumers/students in the
-relevant jurisdiction.]`
-
-## 12. Data Protection
-
-See the separate [Privacy Policy](/privacy) for what data is collected, why,
-and your rights over it. `[PLACEHOLDER: the accompanying Privacy Policy in
-this package is a first draft based on the data the app actually stores; it
-still needs lawyer review before any EU users sign up, per GDPR.]`
-
-## 13. Changes to These Terms
-
-The Platform may update these Terms; continued use after notice constitutes
-acceptance. `[PLACEHOLDER: lawyer to confirm appropriate notice
-period/mechanism.]`
-
-## 14. Governing Law and Disputes
-
-`[PLACEHOLDER: governing law and jurisdiction clause; needs a decision on
-the Platform operator's legal seat and the jurisdictions its student users
-are likely to be in.]`
+> ⚠️ **Not reviewed by a lawyer.** This is a complete, internally consistent draft written to make legal review faster and cheaper — not a substitute for it. Do not publish it, link it from the app, or ask any user to accept it until a lawyer has signed it off. `[DECISION]` = a business choice you need to make. `[LEGAL]` = a question only a lawyer can answer.
 
 ---
 
-# PART 2: PEER SWAP AGREEMENT
+## 1. Who we are
 
-See [the separate Peer Swap Agreement document](/peer-agreement), split out
-so it can be linked and shown on its own at the point a swap is finalized.
+StudSwap is operated by `[LEGAL ENTITY NAME]`, `[SASU / SAS / other]` with share capital of `[€X]`, registered office `[ADDRESS]`, registered at `[RCS CITY, number]`, VAT number `[FR...]`. Publication director: `[NAME]`. Hosting: `[Vercel Inc., address]`.
 
----
+Contact: `[EMAIL]`
 
-## Notes for your lawyer consultation
+`[LEGAL] Article 19 LCEN and Article L.111-1 Code de la consommation set out what must appear here and in the Mentions légales. Confirm the full list, including whether a telephone number is mandatory.`
 
-1. Does the Section 4 "right to list" disclaimer meaningfully limit Platform
-   liability?
-2. Is requiring proof of landlord/university permission before listing
-   (rather than just a checkbox representation) advisable?
-3. What does GDPR require specifically for the verification data (university
-   email) and the profile/message data being processed?
-4. The Platform now charges a real €25 confirmation fee (€5 non-refundable,
-   €20 refundable subject to a contractual promise, not held on the user's
-   behalf) and pays out forfeited amounts manually rather than via automatic
-   transfer — does this design trigger e-money/PSD2 licensing obligations,
-   and is the manual-payout mechanism (Section 8) adequately disclosed?
-5. What governing law/jurisdiction makes sense given the university domains
-   currently allow-listed span many EU countries plus the UK and Switzerland?
+## 2. What these Terms cover
+
+These Terms are a binding contract between you and StudSwap governing your use of the StudSwap website and app ("the Service").
+
+They do **not** govern the accommodation arrangement you make with another user. That is a contract directly between the two of you. StudSwap is not a party to it. The [Peer Swap Agreement](/peer-agreement) is a template we provide for that purpose.
+
+Two further documents form part of your agreement with us:
+
+- the [Fees and Refunds Policy](/fees) — what we charge, and when we refund it;
+- the [Privacy Policy](/privacy) — how we handle your personal data.
+
+Where these Terms and the Fees and Refunds Policy conflict on a money question, that Policy prevails.
+
+## 3. Where we operate
+
+StudSwap is offered to students at universities on our allow-list, currently across the European Union, the United Kingdom and Switzerland. We are established in France.
+
+Wherever you live, **you keep the mandatory consumer protections of your own country.** Nothing in these Terms takes those away. See Section 21.
+
+`[DECISION] Every country you serve adds cost: translation, a national ADR body, and its own unfair-terms rules. The UK and Switzerland are outside the EU/EEA and each bring a separate data protection regime (Section 6 of the Privacy Policy). If either is a handful of users at launch, ask whether they earn their place now or can wait.`
+
+## 4. What StudSwap is — and is not
+
+StudSwap introduces students to each other so they can arrange temporary accommodation exchanges, and gives them tools to record what they agree.
+
+**What we do:**
+
+- check that your sign-up email is on our university domain allow-list;
+- show listings and let users express interest in each other;
+- provide messaging between matched users;
+- let users propose, record and confirm the terms of an arrangement;
+- calculate and display what one user owes the other;
+- charge our own fee when an arrangement is confirmed.
+
+**What we do not do:**
+
+- **We do not handle the money between users.** The price difference in a swap, or the cost of a one-directional stay, is paid **directly from one user to the other**. We never receive it, never hold it, and **cannot recover it if something goes wrong.**
+- We do not inspect, visit, endorse or guarantee any accommodation.
+- We do not verify anyone's identity beyond a university email address.
+- We do not mediate, arbitrate, investigate or decide disputes between users.
+- We are not a landlord, letting agent, property manager, hospitality business, insurer, guarantor, escrow agent, or payment service provider.
+
+**You deal with other users at your own risk.**
+
+`[LEGAL] ⚠️ HIGH PRIORITY — Regulation (EU) 2024/1028 on short-term rental data collection has applied since 20 May 2026. It covers online platforms facilitating short-term accommodation rental, and a One-Directional Stay (Section 7.2) looks like exactly that. If in scope: collect and verify host registration numbers where a national scheme exists, report monthly to each Member State's Single Digital Entry Point, act on delisting orders. Registration schemes differ sharply by city — Paris, Barcelona, Amsterdam, Berlin, Vienna all operate different regimes. This obligation attaches to facilitating the arrangement, so not handling the payment does not exempt us. Assess before any paid stay is facilitated, and note the UK and Switzerland have their own separate rules.`
+
+`[LEGAL] Confirm our status under the Digital Services Act, whether the Article 19 micro/small enterprise exemption applies at launch, and that Section 15 satisfies Articles 12, 14, 16, 17 and 20.`
+
+`[LEGAL] Directive (EU) 2021/514 (DAC7) requires platform operators facilitating rental of immovable property to collect and report seller data. We do not process the rent — confirm whether facilitating and recording it is enough to make us a Reporting Platform Operator, and what the UK equivalent (the OECD Model Rules as implemented) requires.`
+
+## 5. Eligibility
+
+You must:
+
+- be at least 18 years old;
+- be currently enrolled at a university whose email domain is on our allow-list;
+- have legal capacity to contract;
+- not have been previously removed from the Service;
+- act for yourself, as a consumer, not as a business.
+
+If you list accommodation repeatedly or commercially, different rules may apply to you — including obligations you would owe the other party as a professional, and tax obligations. Assessing your own status is your responsibility.
+
+`[LEGAL] Article 6a of Directive 2011/83/EU requires online marketplaces to tell users whether their counterparty is a trader. Confirm whether we qualify and, if so, add a trader declaration to listing creation.`
+
+## 6. Your account
+
+**6.1** Sign in by one-time link to your university email, or by password on that account. The allow-list check applies either way.
+
+**6.2 What "verified" means.** Confirming your email is on a university domain tells us only that you controlled that address when you signed up. **It is not an identity check, proof of current enrolment, a criminal record check, or any guarantee that anyone can be trusted.** We will not describe it as more, and you should not rely on it as more.
+
+`[DECISION] Consider replacing "verified student" in the UI with "university email confirmed". A lawyer should confirm whether "verified" is a misleading commercial practice under Directive 2005/29/EC given what is actually checked.`
+
+**6.3** You are responsible for what you publish, for keeping your credentials secure, and for activity on your account. One account per person. Tell us at `[EMAIL]` if your account is compromised.
+
+**6.4** Tell us if you stop being enrolled. We may suspend accounts where we reasonably believe eligibility has been lost.
+
+## 7. How arrangements work
+
+**7.1 Mutual Swap.** Each user occupies the other's accommodation. If the nightly prices differ, the user receiving the more valuable stay pays the difference to the other.
+
+**7.2 One-Directional Stay.** One user occupies another's accommodation with no reciprocal stay, and pays the full cost. Either side can convert to a Mutual Swap before confirmation.
+
+**7.3 Proposing.** Users agree dates and, optionally, a negotiated nightly price. Either side can change the proposal before both have confirmed; doing so resets both confirmations. **Nothing is charged before both sides confirm.**
+
+**7.4 On confirmation.** When the second party confirms:
+
+(a) a contract is formed **directly between the two users** — see the [Peer Swap Agreement](/peer-agreement). StudSwap is not a party to it and does not guarantee it will be performed;
+
+(b) each user is charged €25 by StudSwap (Section 8);
+
+(c) each user is shown the other's payment details so they can settle between themselves.
+
+**7.5 What we do not check.** We do not confirm the stay happened, inspect the accommodation, hold keys, check who actually occupied it, or investigate what took place.
+
+## 8. What we charge
+
+**8.1** When an arrangement is confirmed, **each user is charged €25**, made up of:
+
+- **€5 service fee** — our charge for the matching and confirmation service. This is our revenue and is **not refunded** if an arrangement is cancelled, except under Section 10.2 or 13.
+- **€20 refundable amount** — **refunded to you 24 hours after your stay begins.** If you cancel late, it is not refunded, and we pay compensation to the other user instead (Section 10).
+
+**8.2 What the €20 is.** It is part of our fee, which we contractually undertake to refund to you once your stay has begun. **It is not a deposit, not held on your behalf, not held for the other user, and not held in escrow.** It is not security for anything you owe the other user, and it does not cover damage, theft, or anything that happens during a stay.
+
+**8.3 It is not an advance payment or *arrhes*.** For the purposes of Article L.214-1 of the French Code de la consommation and any equivalent national rule, the €20 is expressly **not** *arrhes*, a deposit, or an advance on a further payment.
+
+`[LEGAL] Confirm this wording is effective under French law, and check the equivalent presumption in each other country served. Several jurisdictions have their own default rules about sums paid in advance, and the French disclaimer does not automatically travel.`
+
+**8.4 Refund of the €20.** We refund it to your original payment method **24 hours after the agreed start date**, and in the cancellation cases in Section 10. You do not need to ask.
+
+We hold the refund back only where the other party has reported, within that 24-hour window, that you did not provide access or did not turn up. In that case Section 10.5 applies instead and we will tell you.
+
+**8.5 Your right to withdraw.** You have a 14-day statutory right to withdraw from your purchase of our service. How it works, and when it is lost, is in the [Fees and Refunds Policy](/fees), with the model withdrawal form.
+
+**8.6 We take nothing from what you pay the other user.** We charge €25 whatever the size of that amount.
+
+## 9. The money between users — read this carefully
+
+**9.1** The price difference in a swap, or the cost of a one-directional stay, is paid **directly between the two of you.** We calculate the amount, display it, and let you record whether it has been paid. **We do not handle it.**
+
+**9.2 What this means for you:**
+
+- **We never hold this money.** There is no escrow and no protection.
+- **We cannot get it back for you.** If the other user does not pay, does not refund you, or disappears, we have no ability to recover anything and no obligation to try.
+- **Your only recourse is against the other user directly** — by agreement, or through the courts.
+- **The €20 does not cover this.** It is small, it is fixed, and it has nothing to do with the amount you paid.
+
+**9.3** You choose how to pay each other. We show you the payment details the other user has given us. We do not check them, do not guarantee they are correct, and are not responsible if you send money to the wrong place.
+
+**9.4** You must not ask another user to pay you outside the arrangement recorded in the app, or use the Service to arrange payment for anything other than a genuine student accommodation exchange.
+
+## 10. Cancellations
+
+**10.1 Before both sides confirm.** Either side can walk away. Nothing has been charged.
+
+**10.2 After confirmation.** Either party may cancel in the app. What happens depends on the notice given before the start date:
+
+| Notice | Cancelling party | Other party |
+|---|---|---|
+| More than 7 days | €20 refunded. €5 not refunded. | €20 refunded. €5 not refunded. |
+| 7 days or less | **€20 not refunded.** €5 not refunded. | €20 refunded, **plus €20 compensation from StudSwap.** €5 not refunded. |
+
+**10.3 Compensation.** Where the other party cancels on you with 7 days' notice or less, **we** pay you €20. This is our own contractual obligation to you, funded from the fee we charged the person who cancelled. It is not their money passed to you. We pay it by bank transfer to the details you have given us, within `[X]` days.
+
+**10.4 The money between users is not affected.** If you have already paid the other user directly, **that is between you and them.** Cancelling in the app does not reverse it, and we cannot recover it. Ask for it back directly; if they refuse, your recourse is against them.
+
+**10.5 No-shows.** If someone who agreed to provide accommodation becomes uncontactable or does not provide access, that counts as a cancellation by them at the moment access was due.
+
+**10.6 Logging.** Every cancellation is recorded — who, when, and what was charged or refunded. Both parties can see it.
+
+**10.7 Changes.** We may change these thresholds and amounts. Changes apply only to arrangements confirmed afterwards.
+
+`[LEGAL] Confirm the €20 forfeit survives review as a penalty clause under Directive 93/13/EEC and its national implementations — Article R.212-1 Code de la consommation in France, §§307–309 BGB in Germany (stricter on penalties), and equivalents elsewhere. Two points in its favour: the amount is modest and fixed, and it goes to a wronged counterparty rather than to us. Confirm whether we must be able to justify €20 as a genuine estimate of loss, and whether the reciprocal structure helps. This is one of the clauses most likely to be tested country by country.`
+
+`[LEGAL] Section 8.5 gives a 14-day withdrawal right on our service. Section 10.2 penalises cancellation from confirmation onward. These collide: a user who confirms and cancels three days later, ten days before the stay, is inside their withdrawal window. Confirm whether we need an express consent to immediate performance at the confirmation screen — and if so, exactly what it must say.`
+
+## 11. Listings: your right to offer your accommodation
+
+**This is the most important thing you tell us.**
+
+**11.1** By publishing a listing you confirm that:
+
+(a) you have the legal right to occupy the accommodation for those dates, as owner, tenant, subtenant with permission, or lawful occupant;
+
+(b) your lease, housing contract, residence rules, co-ownership rules and applicable law **allow** you to let someone else occupy it on these terms — or you have written permission from your landlord or housing office;
+
+(c) the accommodation exists, is as described, and the photographs are current and genuine;
+
+(d) you have obtained any registration, authorisation or declaration required by law where the accommodation is — including, where applicable, a registration number — and will give it to us if we ask.
+
+**11.2** You are solely responsible for complying with your own lease, your housing provider's rules, local housing and tourism law, and any tax on what you receive. **We do not check any of this and are not liable for the consequences if you get it wrong** — including lease termination, eviction, loss of your deposit, fines, or claims by your landlord.
+
+**11.3 University and social housing.** Housing allocated on a social or institutional basis — CROUS in France, Studierendenwerk in Germany, university halls in the UK, and equivalents elsewhere — almost always prohibits subletting or transferring occupancy, often with immediate termination as the penalty. **Do not list it unless you have written permission.**
+
+`[LEGAL] ⚠️ HIGHEST PRIORITY. Confirm: (a) whether a self-attestation meaningfully protects us when we facilitate the arrangement and charge a fee; (b) whether we should require uploaded proof of permission before a listing goes live; (c) whether One-Directional Stays should be blocked for users in social or university housing; (d) whether charging a flat matching fee — rather than a share of the rent — improves our position, given we now take nothing from the amount paid between users.`
+
+`[DECISION] Cheap middle path: make users select their housing type (private rental / owned / university or social / other), show a housing-type-specific warning, and log a separate attestation for high-risk categories. Produces evidence a specific warning was shown, without killing signup.`
+
+## 12. Ratings and reviews
+
+After a stay, each party may rate the other. Ratings stay hidden until both have submitted or `[X]` days pass.
+
+Reviews must be an honest account of your actual experience. Do not publish anything false, retaliatory, abusive, discriminatory, or containing personal data about third parties. We may remove reviews that breach this, following Section 15.
+
+If you think a review about you is false, contact `[EMAIL]`. We will ask the reviewer to substantiate it and remove it if they do not respond within `[X]` days.
+
+`[LEGAL] Confirm: defamation exposure for hosting reviews, which varies significantly across the countries served; the GDPR basis for publishing reviews about an identified individual; and whether Annex I points 23b–23c of Directive 2005/29/EC apply, requiring us to state what we do to check reviews come from real stays.`
+
+## 13. When things go wrong on our side
+
+If an arrangement cannot go ahead because of a fault on our side — a defect in the Service, a wrongful suspension, or a payment failure attributable to us — we refund **the full €25** to both parties. This is your right, not a gesture, and it applies regardless of which side you were on.
+
+This does not limit your other remedies, including under the law implementing Directive (EU) 2019/770 on digital content and services (or, for UK users, the Consumer Rights Act 2015).
+
+## 14. Prohibited conduct
+
+You must not:
+
+- misrepresent your identity, student status, accommodation, or right to offer it;
+- list accommodation you have no right to offer;
+- create multiple accounts;
+- use the Service for a stay longer than `[X weeks]` `[DECISION: set a maximum — longer stays are more likely to create a protected tenancy, and the threshold differs by country]`, for permanent relocation, or for anything other than genuine temporary student accommodation exchange;
+- discriminate against another user on any protected ground;
+- harass, threaten, defraud, stalk or abuse anyone;
+- install or leave operating any camera or recording device inside accommodation during someone else's stay;
+- scrape the Service, attempt unauthorised access, or upload malware;
+- publish unlawful, defamatory, or sexually explicit content, or anything infringing someone's rights;
+- use the Service to advertise anything unrelated.
+
+## 15. Reporting and moderation
+
+**15.1** Report content you believe is illegal at `[REPORTING CHANNEL]`. Say what it is, where it is, and why.
+
+**15.2** We handle reports in a timely, diligent, non-arbitrary and objective way. We confirm receipt and tell you our decision and reasons.
+
+**15.3** Where content breaches these Terms or the law, we may remove it, restrict it, or suspend or terminate the account. We give the affected user a statement of reasons unless the law prevents us.
+
+**15.4** If we remove your content or suspend your account, or reject a report you made, you can challenge it for `[6] months` at `[EMAIL]`. A person reviews it, not an automated system.
+
+**15.5** After warning, we may suspend users who repeatedly post manifestly illegal content, or who repeatedly file manifestly unfounded reports.
+
+**15.6 Contacts.** Users: `[EMAIL]`. Authorities: `[EMAIL]`. Languages for communication with authorities: `[French and English — confirm this is accepted]`.
+
+## 16. Suspension and termination
+
+**16.1** You can stop using the Service and delete your account at any time. Deleting your account does not release you from an arrangement you have confirmed, and does not entitle you to a refund except under Section 8 or 10.
+
+**16.2** We may suspend or terminate your access where we reasonably believe you have breached these Terms, where the law requires it, or where you present a risk to other users. Unless the law or a serious risk prevents it, we tell you why and let you respond.
+
+**16.3** Sections 9, 11.2, 17, 18, 19 and 22 survive termination.
+
+## 17. Availability
+
+We provide the Service with reasonable care and skill but do not promise it will be uninterrupted or error-free. We may change or discontinue features, with notice under Section 20 where a change materially reduces the Service. This does not affect your statutory rights in respect of digital services.
+
+## 18. Our liability
+
+**18.1** We are liable for loss caused by our own breach or negligence, but not for loss that was not reasonably foreseeable.
+
+**18.2** Subject to 18.3, **we are not liable for**:
+
+- the condition, safety, legality or availability of any accommodation;
+- the conduct, honesty or solvency of any user;
+- **any money you pay to, or fail to receive from, another user** (Section 9);
+- disputes between users, or non-performance of a Peer Swap Agreement;
+- any consequence of your breach of your own lease or housing agreement;
+- loss of or damage to property during a stay;
+- lost profit, business or opportunity, the Service being for personal use.
+
+**18.3** **Nothing excludes our liability for death or personal injury caused by our negligence, for fraud, for gross negligence or wilful misconduct, or for anything that cannot lawfully be excluded.** Your mandatory rights as a consumer are unaffected.
+
+**18.4** Subject to 18.3, our total liability to you for all claims in any 12-month period is limited to `[AMOUNT — TBD]`.
+
+`[LEGAL] ⚠️ Liability caps against consumers are restricted differently in every country served. A cap valid in France may be void in Germany. Confirm whether a single figure works across the EU, UK and Switzerland, or whether jurisdiction-specific wording is required — and whether including an unenforceable cap carries its own risk.`
+
+## 19. If you cause us loss
+
+If someone brings a claim against us because you breached Section 11 or Section 14, or because of your conduct during a stay, you are responsible for our reasonable resulting losses **to the extent the claim is your fault**.
+
+`[LEGAL] Broad indemnities against consumers are often unenforceable. This is narrowed to fault-based liability. Confirm it survives across the countries served, and whether it is worth keeping.`
+
+## 20. Changes to these Terms
+
+We may change these Terms. For changes materially affecting your rights, we give at least `[30]` days' notice by email and in the app, saying what has changed. If you do not accept, you can close your account before the change takes effect. Continued use afterwards is acceptance. Changes required by law may take effect sooner.
+
+Changes never apply to an arrangement already confirmed.
+
+`[LEGAL] Confirm "continued use = acceptance" is valid for material changes in each country served; some require express consent.`
+
+## 21. Law, jurisdiction and your rights as a consumer
+
+**21.1 Governing law.** These Terms are governed by French law.
+
+**21.2 Your protections travel with you.** If you live in another country, **this choice of law does not deprive you of the mandatory consumer protections of the country where you live.** Those rules continue to apply to you.
+
+**21.3 Where you can sue.** You may bring proceedings against us either in the French courts or in the courts of the country where you live. We will only bring proceedings against you in the courts of the country where you live.
+
+**21.4 Complaints.** Contact us first at `[EMAIL]`. We aim to reply within `[X]` working days.
+
+**21.5 Mediation.** As a French trader dealing with consumers, we offer free access to a consumer mediator: `[MEDIATOR NAME, address, website]`. You may refer a dispute to them if you have first tried to resolve it with us in writing. If you live elsewhere, you may also use an approved ADR body in your own country, or contact your local European Consumer Centre.
+
+`[LEGAL] ⚠️ Article L.612-1 Code de la consommation obliges French traders to designate a consumer mediator and publish their details — not optional, and needed before launch. Confirm whether serving consumers in other countries triggers additional national ADR obligations. Note the EU ODR platform was permanently discontinued on 20 July 2025 — do not add an ODR link anywhere; referencing a defunct platform is itself a risk.`
+
+**21.6 UK and Swiss users.** If you live in the UK or Switzerland, your national consumer protection law may give you rights in addition to those above, and nothing here limits them. `[LEGAL — confirm what specifically needs saying for UK users under the Consumer Rights Act 2015 and for Swiss users, and whether a UK ADR scheme is required.]`
+
+## 22. General
+
+**22.1** You cannot transfer your rights. We may transfer ours to a successor of our business without reducing your rights.
+
+**22.2** If a provision is unenforceable, the rest stands.
+
+**22.3** Not enforcing a provision does not waive it.
+
+**22.4** These Terms, with the documents named in Section 2, are the whole agreement about the Service.
+
+**22.5 Language.** These Terms are provided in `[LANGUAGES]`. `[LEGAL] ⚠️ Several countries require consumer terms in the local language — this is a real translation cost across the EU. Confirm which of the countries served will accept English, and note that the French version must exist and will generally prevail for a French entity.]`
+
+## 23. Contact
+
+`[ENTITY]`, `[ADDRESS]`
+General `[EMAIL]` · Reports `[EMAIL]` · Privacy `[EMAIL]` · Authorities `[EMAIL]`

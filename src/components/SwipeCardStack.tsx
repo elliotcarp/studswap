@@ -14,9 +14,14 @@ import type { PanInfo } from "framer-motion";
 import type { ProfileCardData, SwipeDirection } from "@/types";
 import ProfileCard from "./ProfileCard";
 import { FlameIcon } from "./icons";
+import { SPRING_DEFAULT, SPRING_MOMENTUM, project, usePrefersReducedMotion } from "@/lib/motion";
 
 const SWIPE_THRESHOLD = 100; // px
-const EXIT_DISTANCE = 500; // px
+const EXIT_DISTANCE = 500; // px, floor for how far off-screen a card travels
+// Synthetic release velocity for a button tap (no real gesture happened),
+// so the Like/Pass buttons feel like the same flick a fast drag would be,
+// not a different, flatter animation — see motion.ts's SPRING_MOMENTUM.
+const BUTTON_TAP_VELOCITY = 1200; // px/s
 
 interface CardHandle {
   triggerExit: (direction: SwipeDirection) => void;
@@ -69,13 +74,17 @@ export default function SwipeCardStack({ profiles, onSwipe }: SwipeCardStackProp
       {/* Overlaid on the card, not a separate row: a scrim behind the
           buttons keeps them legible over whatever scrolls underneath, and
           the card's own bottom padding (see ProfileCard) keeps its last
-          section clear of this zone. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center gap-6 bg-gradient-to-t from-white/90 via-white/60 to-transparent pb-5 pt-10">
+          section clear of this zone. rounded-b-card matches ProfileCard's
+          own bottom corners — this scrim sits outside that card's
+          overflow-hidden wrapper (it's a sibling, not a child, so the
+          buttons stay clickable above the card's own scroll), so without
+          this its square corners poke past the card's rounded ones. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center gap-6 overflow-hidden rounded-b-card bg-gradient-to-t from-white/90 via-white/60 to-transparent pb-5 pt-10">
         <button
           type="button"
           onClick={() => topCardRef.current?.triggerExit("LEFT")}
           aria-label="Pass"
-          className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-spritz text-2xl text-white shadow-lg shadow-spritz/40"
+          className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-spritz text-2xl text-white shadow-lg shadow-spritz/40 transition-transform active:scale-90"
         >
           ✕
         </button>
@@ -83,7 +92,7 @@ export default function SwipeCardStack({ profiles, onSwipe }: SwipeCardStackProp
           type="button"
           onClick={() => topCardRef.current?.triggerExit("RIGHT")}
           aria-label="Interested"
-          className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-bloom to-riviera text-2xl text-white shadow-lg shadow-bloom/40"
+          className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-bloom to-riviera text-2xl text-white shadow-lg shadow-bloom/40 transition-transform active:scale-90"
         >
           ✓
         </button>
@@ -106,29 +115,62 @@ const Card = forwardRef<
   const likeOpacity = useTransform(x, [20, 120], [0, 1]);
   const passOpacity = useTransform(x, [-120, -20], [1, 0]);
   const [exiting, setExiting] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
 
-  function exit(direction: SwipeDirection) {
+  // velocityX: the gesture's actual release velocity (px/s) for a drag, or
+  // a synthetic "as if flicked" one for a button tap — either way this is
+  // handed straight to the spring (velocity handoff, skill §5) so there's
+  // no seam between how the card was moving and how it leaves.
+  function exit(direction: SwipeDirection, velocityX = direction === "RIGHT" ? BUTTON_TAP_VELOCITY : -BUTTON_TAP_VELOCITY) {
     if (exiting) return;
     setExiting(true);
-    animate(x, direction === "RIGHT" ? EXIT_DISTANCE : -EXIT_DISTANCE, {
-      duration: 0.25,
-      ease: "easeOut",
+    const sign = direction === "RIGHT" ? 1 : -1;
+    if (reducedMotion) {
+      // No spring/momentum under reduced motion — a quick, flat fade-out
+      // instead (skill §14: cross-fade, drop elastic/overshoot).
+      animate(x, sign * EXIT_DISTANCE, {
+        duration: 0.15,
+        ease: "easeOut",
+        onComplete: () => onSwipe(profile.userId, direction),
+      });
+      return;
+    }
+    // Project where this velocity would naturally land (skill §6), floored
+    // at EXIT_DISTANCE so a slow deliberate drag-past-threshold (near-zero
+    // release velocity) still fully clears the screen instead of stopping
+    // just past the threshold.
+    const target = sign * Math.max(EXIT_DISTANCE, Math.abs(project(velocityX)));
+    animate(x, target, {
+      ...SPRING_MOMENTUM,
+      velocity: velocityX,
       onComplete: () => onSwipe(profile.userId, direction),
     });
   }
 
-  useImperativeHandle(ref, () => ({ triggerExit: exit }));
+  useImperativeHandle(ref, () => ({ triggerExit: (direction: SwipeDirection) => exit(direction) }));
+
+  function handleDragStart() {
+    // Grabbing the card again mid-exit interrupts the in-flight animation
+    // (Framer Motion hands x back to the pointer automatically), but
+    // `exiting` would otherwise stay stuck true forever, since the
+    // interrupted animation's onComplete never fires — leaving the next
+    // release silently ignored. Resetting here is what makes the card
+    // actually interruptible (skill §3), not just draggable.
+    setExiting(false);
+  }
 
   function handleDragEnd(_event: unknown, info: PanInfo) {
     if (exiting) return;
     const offsetX = info.offset.x;
 
     if (Math.abs(offsetX) < SWIPE_THRESHOLD) {
-      animate(x, 0, { type: "spring", stiffness: 300, damping: 30 });
+      // Hand off velocity here too: a partial drag released with momentum
+      // should snap back carrying that momentum, not from a standing start.
+      animate(x, 0, reducedMotion ? { duration: 0.15 } : { ...SPRING_DEFAULT, velocity: info.velocity.x });
       return;
     }
 
-    exit(offsetX > 0 ? "RIGHT" : "LEFT");
+    exit(offsetX > 0 ? "RIGHT" : "LEFT", info.velocity.x);
   }
 
   return (
@@ -147,6 +189,7 @@ const Card = forwardRef<
       drag={isTop ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={1}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
       <ProfileCard profile={profile} />

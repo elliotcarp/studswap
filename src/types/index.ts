@@ -16,13 +16,27 @@ export interface ProfileFormData {
   availableTo: string; // yyyy-mm-dd
   accommodates: string; // "1" | "2" | "3" | "4" | "5+"
   pricePerDayCents: string; // numeric string, form input value, in cents (EUR)
+  // Optional flat monthly rate for long stays, empty string if not set —
+  // never used in settlement math, purely a second informational number
+  // shown alongside the day rate. See Profile.pricePerMonthCents.
+  pricePerMonthCents: string;
   smoker: string;
   pets: string;
   selfPhotoUrls: string[]; // photos of the person; [0] is the profile picture
-  flatPhotoUrls: string[]; // photos of the flat
+  // Photos of the flat; [0] is the cover photo — shown before selfPhotoUrls
+  // on ProfileCard, since the flat is what leads a StudSwap card.
+  flatPhotoUrls: string[];
+  // Optional walkthrough video of the flat, empty string if not set. See
+  // Profile.flatVideoUrl.
+  flatVideoUrl: string;
   selfDescription: string;
   flatDescription: string;
   prompts: PromptAnswer[];
+  // Short-term rental registration number (EU 2024/1028), or the exempt
+  // flag if the city requires none. Compliance data, never sent to another
+  // user — see toProfileCardData, which always blanks these out.
+  shortTermRentalRegistrationNumber: string;
+  shortTermRentalRegistrationExempt: boolean;
 }
 
 // Denormalized rating aggregate for a profile (see Rating model /
@@ -91,7 +105,11 @@ export interface LikerSummary {
   homeCity: string;
   photoUrl: string | null;
   pricePerDayCents: number;
-  totalPriceCents: number; // pricePerDayCents * their listed stay length
+  // Priced off pricePerMonthCents instead of pricePerDayCents once
+  // stayDurationDays reaches a month, if a monthly rate is set — see
+  // lib/pricing.ts's estimatedTotalCents.
+  totalPriceCents: number;
+  stayDurationDays: number;
 }
 
 // A validated (confirmed) match, for the "Your swaps" page: the settlement
@@ -120,7 +138,9 @@ export interface SwapSummary {
     confirmedReceivedByPayee: boolean;
   };
   // Only set once VALIDATED (which this always is, on the Swaps page) — how
-  // to actually pay/reach the other side directly.
+  // to actually pay/reach the other side directly. otherPaymentMethod is
+  // one of PAYMENT_METHODS' values (src/lib/paymentMethods.ts).
+  otherPaymentMethod: string | null;
   otherPaymentHandle: string | null;
   // Outcome of the viewer's own €20 refundable portion of the confirmation
   // charge (see cancellationPolicy.ts): refunded a day into the stay, or

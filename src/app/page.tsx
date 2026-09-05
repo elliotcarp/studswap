@@ -46,8 +46,14 @@ const FEATURES = [
   {
     icon: "🤝",
     title: "Matchmaking, not a payment processor",
-    body: "We calculate and show the price difference on a swap, or the full stay cost on a one-directional stay, but you and your match settle it directly between yourselves. The only thing StudSwap charges is a flat €25 confirmation fee per side to keep both sides honest.",
+    body: "We calculate and show the price difference on a swap, or the full stay cost on a one-directional stay, but you and your match settle it directly between yourselves.",
     wash: "from-spritz/15 to-bloom/15",
+  },
+  {
+    icon: "🛡️",
+    title: "An optional deposit contract for peace of mind",
+    body: "Alongside the Peer Swap Agreement, confirming a swap offers you a ready-to-use Damage Deposit Agreement template, so you and your match can protect yourselves against damage directly between you. StudSwap isn't a party to it.",
+    wash: "from-bloom/15 to-spritz/15",
   },
 ];
 
@@ -91,7 +97,7 @@ export default async function LandingPage() {
           the rest of the hero, since this page has no other sticky nav.
           See CinematicBackdrop for the layered aurora/skyline/grain, also
           reused (static, no parallax) at the closing CTA. */}
-      <section className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#0B0912]">
+      <section className="relative flex min-h-[100svh] shrink-0 flex-col overflow-hidden bg-[#0B0912]">
         <ParallaxLayer>
           <CinematicBackdrop skylineClassName="h-[68vh] min-h-[380px]" />
         </ParallaxLayer>
@@ -267,8 +273,17 @@ export default async function LandingPage() {
 
       <FaqSection />
 
-      {/* Final CTA: closes the film on the same night skyline it opened on. */}
-      <section className="relative overflow-hidden bg-[#0B0912] px-6 py-24 text-center md:py-32">
+      {/* Final CTA: closes the film on the same night skyline it opened on.
+          shrink-0: this is a flex item in the page's flex-col scroll
+          container, and overflow-hidden (needed to clip CinematicBackdrop)
+          makes a flex item's automatic minimum size 0 by spec — without
+          shrink-0, once total page content exceeds one screen, flexbox
+          shrinks this section below its own content height instead of
+          letting the container scroll, clipping the text/button at the
+          bottom. The hero section has the same overflow-hidden but is
+          saved by its min-h-[100svh] giving it a floor; this section had
+          no such floor. */}
+      <section className="relative shrink-0 overflow-hidden bg-[#0B0912] px-6 py-24 text-center md:py-32">
         {/* Vignette back on (unlike the hero, this section had it off), so
             the aurora glow can't wash out the text under it. */}
         <CinematicBackdrop />

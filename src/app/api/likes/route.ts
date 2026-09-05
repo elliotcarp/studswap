@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
-import { totalStayPriceCents } from "@/lib/pricing";
+import { stayDurationDays, totalStayPriceCents } from "@/lib/pricing";
 import { deriveChatPreview } from "@/lib/matchPreview";
 import type { LikerSummary, MatchSummary } from "@/types";
 
@@ -59,8 +59,10 @@ export async function GET() {
       totalPriceCents: totalStayPriceCents(
         myProfile!.pricePerDayCents,
         myProfile!.availableFrom,
-        myProfile!.availableTo
+        myProfile!.availableTo,
+        myProfile!.pricePerMonthCents
       ),
+      stayDurationDays: stayDurationDays(myProfile!.availableFrom, myProfile!.availableTo),
     }));
 
   const connections: MatchSummary[] = paidMatches.map((match) => {

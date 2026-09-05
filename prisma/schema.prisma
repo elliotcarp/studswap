@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -63,22 +63,22 @@ model User {
   // means they haven't agreed yet.
   acceptedTermsAt DateTime?
   createdAt     DateTime  @default(now())
-  // Free-text instructions for how someone should pay this user directly
-  // (e.g. "PayPal: name@example.com", IBAN, Venmo handle). StudSwap never
-  // moves this money — it's only ever displayed to a matched counterpart
-  // after both sides confirm, see Match.
-  paymentHandle String?
-
-  // Stripe Connect Express account — created lazily, only once this user is
-  // actually owed a forfeiture payout (see ForfeiturePayout), never at
-  // signup. This is real money StudSwap sends TO the user (unlike
-  // paymentHandle above, which is just displayed text), so it needs a real
-  // payout-capable account with identity verification behind it.
-  stripeConnectAccountId       String?
-  // Cached from the account.updated webhook so payout attempts don't need a
-  // live Stripe API call just to check onboarding status. Stays false until
-  // Stripe confirms the account can actually receive transfers.
-  stripeConnectPayoutsEnabled  Boolean @default(false)
+  // How someone should pay this user directly. paymentMethod picks which
+  // kind of destination paymentHandle actually holds ("IBAN" | "PAYPAL" |
+  // "REVOLUT" | "OTHER" — see PAYMENT_METHODS in
+  // src/lib/paymentMethods.ts, the single source of truth for
+  // the set and labels), so the UI can ask for the right field instead of
+  // one generic free-text box. paymentHandleAccountName is the name on the
+  // account, common to every method. StudSwap never moves this money —
+  // it's only ever displayed to a matched counterpart after both sides
+  // confirm (as a frozen snapshot, see Match.paymentMethodSnapshotUserA/B /
+  // paymentHandleSnapshotUserA/B), and is collected at listing creation
+  // (onboarding), not mid-confirmation. A user who is due to receive money
+  // can't confirm a match until both are set — see
+  // /api/matches/[id]/confirm.
+  paymentMethod            String?
+  paymentHandle            String?
+  paymentHandleAccountName String?
 
   accounts Account[]
   sessions Session[]
@@ -116,18 +116,39 @@ model Profile {
   availableFrom DateTime
   availableTo   DateTime
   accommodates  Int      // how many people the flat can host
+  // Short-term rental registration number for the accommodation, required
+  // under EU Regulation 2024/1028 wherever the city it's in runs a
+  // registration scheme — collected at listing creation because any listing
+  // could end up being used for a one-directional stay, not just a swap.
+  // Exactly one of these two is required (enforced in /api/profile): either
+  // a non-empty registration number, or the exempt flag. Never shown on the
+  // public swipe card (compliance data, not a matching signal) — same
+  // visibility tier as address, shown on the profile's own detail view.
+  shortTermRentalRegistrationNumber String?
+  shortTermRentalRegistrationExempt Boolean @default(false)
   // Self-set price per day, in cents (EUR). Informational only — used to
   // calculate and display the stay cost / fairness difference between two
   // profiles, see Match.settlementAmountCents. StudSwap never collects or
   // moves this money; the two users settle it directly between themselves.
   pricePerDayCents Int
+  // Optional flat monthly rate, for stays long enough that a day rate isn't
+  // how either side actually thinks about the cost. Never used in any
+  // settlement math (that's still always pricePerDayCents x nights, see
+  // Match.settlementAmountCents) — purely a second informational number
+  // shown alongside the day rate wherever a listing's price is shown.
+  pricePerMonthCents Int?
   smoker        String   // "No" | "Occasionally" | "Yes" | "Prefer not to say"
   pets          String   // "No pets" | "Have a pet" | "Open to pets" | "Prefer not to say"
   // JSON-encoded string arrays, e.g. '["https://...","https://..."]'. Kept as two
   // separate fields (rather than one ordered list) so "which photos are of you"
-  // vs. "which are of the flat" is unambiguous, selfPhotoUrls[0] is the profile picture.
+  // vs. "which are of the flat" is unambiguous. selfPhotoUrls[0] is the profile
+  // picture; flatPhotoUrls[0] is the cover photo, shown first on ProfileCard.
   selfPhotoUrls String
   flatPhotoUrls String
+  // Optional walkthrough video of the flat, uploaded straight from the
+  // browser to Blob storage (see /api/upload/video) since videos routinely
+  // exceed the ~4.5MB body limit on a normal server-proxied upload route.
+  flatVideoUrl  String?
   // Free-text bios shown on the profile card, separate from the prompt Q&A below.
   selfDescription String?
   flatDescription String?
@@ -204,6 +225,35 @@ model Match {
   // enforced.
   settlementMarkedPaidByPayer          Boolean @default(false)
   settlementConfirmedReceivedByPayee   Boolean @default(false)
+  // Set by either side once, flagging that the off-platform settlement
+  // didn't happen as expected ("they never paid me" / "I paid and they say
+  // they didn't get it"). StudSwap doesn't arbitrate — this is purely a flag
+  // for the admin list (see /api/admin) so a real complaint has somewhere to
+  // land, per the Fees policy's "we cannot recover this money for you."
+  settlementDisputeReportedByUserId String?
+  settlementDisputeReportedAt       DateTime?
+  settlementDisputeNote             String?
+  // Frozen at the moment the match becomes VALIDATED (see
+  // /api/stripe/webhook), from each user's User.paymentHandle/
+  // paymentHandleAccountName at that instant — so if someone edits their
+  // payout details afterward, an already-confirmed arrangement keeps
+  // showing what was current when it was confirmed, and nobody gets
+  // redirected mid-flight.
+  paymentMethodSnapshotUserA             String?
+  paymentMethodSnapshotUserB             String?
+  paymentHandleSnapshotUserA             String?
+  paymentHandleSnapshotUserB             String?
+  paymentHandleAccountNameSnapshotUserA  String?
+  paymentHandleAccountNameSnapshotUserB  String?
+  // Set once by whichever side reports that the other never gave them
+  // access / never turned up (see /api/matches/[id]/report-no-show). Under
+  // the Terms, a no-show counts as a cancellation by the reported-against
+  // side at the moment access was due — see noShow.ts, called from
+  // swapLifecycle.ts before the blanket 24h auto-refund, so a report filed
+  // within that window holds back the reported-against side's refund
+  // instead of letting it fire automatically.
+  noShowReportedByUserId String?
+  noShowReportedAt       DateTime?
   // The €25-per-person confirmation charge (€5 non-refundable service fee +
   // €20 refundable, refunded on completion). This money belongs to StudSwap
   // from the moment it's charged, subject to a contractual promise to
@@ -217,7 +267,8 @@ model Match {
   // Outcome of the €20 refundable portion for each side: "PENDING" until the
   // stay has been underway for a day or the match is cancelled, then
   // "REFUNDED" (refunded to that side) or "FORFEITED" (that side cancelled
-  // late — see cancellationPolicy.ts and ForfeiturePayout).
+  // late, or was reported as a no-show before this refund was processed —
+  // see cancellationPolicy.ts, noShow.ts and ForfeiturePayout).
   refundableStatusUserA     String    @default("PENDING")
   refundableStatusUserB     String    @default("PENDING")
   refundableResolvedAtUserA DateTime?
@@ -306,9 +357,12 @@ model CancellationLog {
   // Only the canceller's own €20 refundable portion is ever at stake — the
   // other side's €20 is refunded immediately either way, since the stay
   // isn't happening (see cancellationPolicy.ts). The €5 service fee is
-  // never refunded to either side regardless of outcome.
-  outcome                  String // "REFUNDED" | "FORFEITED"
-  refundableForfeitedCents Int // 0 if REFUNDED, 2000 if FORFEITED
+  // never refunded to either side regardless of outcome, except OUR_FAULT.
+  // "OUR_FAULT": an admin-triggered full €25 refund to both sides (see
+  // /api/admin/matches/[id]/void-our-fault) — one row per user, nobody
+  // forfeited anything, no ForfeiturePayout is created.
+  outcome                  String // "REFUNDED" | "FORFEITED" | "OUR_FAULT"
+  refundableForfeitedCents Int // 0 if REFUNDED or OUR_FAULT, 2000 if FORFEITED
 
   match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
 
@@ -316,12 +370,16 @@ model CancellationLog {
 }
 
 // A payout StudSwap owes someone — created when the other side of their
-// match cancelled late and forfeited their €20 refundable portion (see
-// cancellationPolicy.ts). This is NOT a balance: it is never summed, never
-// applied toward a future charge, and never spent — each row is a single
-// obligation, paid via a real Stripe Connect transfer (see
-// stripeConnect.ts) once the recipient has a payout-capable account, or
-// left PENDING until they set one up (see User.stripeConnectAccountId).
+// match cancelled late (or was a reported no-show) and forfeited their €20
+// refundable portion (see cancellationPolicy.ts / noShow.ts). This is our
+// own obligation, not the forfeiting side's money passed through — it is
+// funded from the fee we charged them, kept separately as our revenue. NOT
+// a balance: never summed, never applied toward a future charge, never
+// spent — each row is a single obligation. Deliberately NOT paid via an
+// automated transfer (see the removed stripeConnect.ts / this repo's git
+// history): at this scale it's a handful a month, paid by manual bank
+// transfer to recipient.paymentHandle and marked paid with a reference —
+// see /api/admin.
 model ForfeiturePayout {
   id            String    @id @default(cuid())
   matchId       String
@@ -329,13 +387,10 @@ model ForfeiturePayout {
   amountCents   Int       @default(2000)
   status        String    @default("PENDING") // "PENDING" | "PAID"
   note          String?
-  // Set once the Stripe Transfer actually succeeds — the idempotency guard
-  // that stops a payout from ever being sent twice.
-  stripeTransferId String?
-  // Updated on every attempt, success or failure (e.g. the platform's test
-  // balance hasn't settled yet) — lets the UI tell the recipient "we tried
-  // as recently as X" instead of a static, meaningless "in progress".
-  lastAttemptAt DateTime?
+  // The bank-transfer reference an admin enters when marking this paid —
+  // set together with status: "PAID". Never a Stripe object: this payout is
+  // sent outside Stripe entirely.
+  paidReference String?
   createdAt     DateTime  @default(now())
   paidAt        DateTime?
 

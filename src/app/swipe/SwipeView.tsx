@@ -5,10 +5,13 @@
 // signals a match -> show match modal -> link to /matches/[id]
 
 import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import SwipeCardStack from "@/components/SwipeCardStack";
 import FilterPanel from "@/components/swipe/FilterPanel";
 import MatchReveal from "@/components/MatchReveal";
+import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
 import { ProfileCardSkeleton } from "@/components/Skeleton";
+import Button from "@/components/ui/Button";
 import type { CandidateFilters, ProfileCardData, SwipeDirection } from "@/types";
 
 function buildQuery(filters: CandidateFilters): string {
@@ -33,10 +36,14 @@ export default function SwipeView({
   defaultTripFrom,
   defaultTripTo,
   myCity,
+  selfPhotoCount,
+  flatPhotoCount,
 }: {
   defaultTripFrom: string;
   defaultTripTo: string;
   myCity: string;
+  selfPhotoCount: number;
+  flatPhotoCount: number;
 }) {
   const [filters, setFilters] = useState<CandidateFilters>({
     city: "",
@@ -86,23 +93,21 @@ export default function SwipeView({
   const activeCount = countActive(filters);
 
   return (
-    <main className="flex h-screen flex-col p-4 pb-24 md:ml-56 md:pb-6">
+    <main className="app-bg flex h-screen flex-col p-4 pb-24 md:ml-56 md:pb-6">
       <div className="mx-auto flex h-full w-full max-w-md flex-col">
-      <div className="mb-2 flex items-center justify-between">
-        <h1 className="font-display text-lg font-bold">Discover flats</h1>
-        <button
-          type="button"
-          onClick={() => setShowFilters(true)}
-          className="flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700"
-        >
+      <div className="mb-3 flex items-center justify-between">
+        <h1 className="font-display text-2xl font-bold text-chalk">Discover flats</h1>
+        <Button variant="secondary" onClick={() => setShowFilters(true)} className="!px-4 !py-2 text-sm">
           Filters
           {activeCount > 0 && (
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-riviera text-xs text-white">
               {activeCount}
             </span>
           )}
-        </button>
+        </Button>
       </div>
+
+      <ProfileCompletionBanner selfPhotoCount={selfPhotoCount} flatPhotoCount={flatPhotoCount} />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -113,27 +118,33 @@ export default function SwipeView({
       )}
       </div>
 
-      {showFilters && (
-        <FilterPanel
-          filters={filters}
-          onClose={() => setShowFilters(false)}
-          onApply={(next) => {
-            setFilters(next);
-            setShowFilters(false);
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {showFilters && (
+          <FilterPanel
+            key="filters"
+            filters={filters}
+            onClose={() => setShowFilters(false)}
+            onApply={(next) => {
+              setFilters(next);
+              setShowFilters(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
-      {match && (
-        <MatchReveal
-          matchId={match.matchId}
-          myCity={myCity}
-          otherName={match.otherName}
-          otherCity={match.otherCity}
-          matchType="MUTUAL"
-          onClose={() => setMatch(null)}
-        />
-      )}
+      <AnimatePresence>
+        {match && (
+          <MatchReveal
+            key="match-reveal"
+            matchId={match.matchId}
+            myCity={myCity}
+            otherName={match.otherName}
+            otherCity={match.otherCity}
+            matchType="MUTUAL"
+            onClose={() => setMatch(null)}
+          />
+        )}
+      </AnimatePresence>
     </main>
   );
 }

@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { CANCELLATION_POLICY, computeCancellationOutcome, daysNotice } from "@/lib/cancellationPolicy";
-import { processPendingPayoutsForUser } from "@/lib/stripeConnect";
 
 // POST: cancel a match. Two structurally different paths:
 // - PENDING (never validated — status only reaches VALIDATED once BOTH
@@ -201,26 +200,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
       console.error("Cancellation refund failed for the cancelling side:", err);
     }
   } else if (outcome === "FORFEITED") {
-    try {
-      // myRefundableStatus is guaranteed PENDING here (see the outcome
-      // derivation above), so no guard needed on this write.
-      await prisma.match.update({
-        where: { id: match.id },
-        data: isUserA
-          ? { refundableStatusUserA: "FORFEITED", refundableResolvedAtUserA: now }
-          : { refundableStatusUserB: "FORFEITED", refundableResolvedAtUserB: now },
-      });
-      // If the affected side already has a payout-capable Connect account
-      // (e.g. from an earlier forfeiture), send this one immediately
-      // instead of leaving it PENDING until they next revisit the app —
-      // see stripeConnect.ts. A brand-new recipient has no account yet, so
-      // this is a no-op for them until they complete onboarding (prompted
-      // from the cancelled-swap card), at which point account.updated
-      // picks it up.
-      await processPendingPayoutsForUser(affectedUserId);
-    } catch (err) {
-      console.error("Marking forfeiture / attempting payout failed:", err);
-    }
+    // myRefundableStatus is guaranteed PENDING here (see the outcome
+    // derivation above), so no guard needed on this write. The
+    // ForfeiturePayout row created above is left PENDING — it's paid by
+    // manual bank transfer, not an automated transfer, see ForfeiturePayout
+    // model comment and /api/admin.
+    await prisma.match.update({
+      where: { id: match.id },
+      data: isUserA
+        ? { refundableStatusUserA: "FORFEITED", refundableResolvedAtUserA: now }
+        : { refundableStatusUserB: "FORFEITED", refundableResolvedAtUserB: now },
+    });
   }
 
   return NextResponse.json({

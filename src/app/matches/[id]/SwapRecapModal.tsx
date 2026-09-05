@@ -6,6 +6,7 @@
 // swap details" button, since that information otherwise only ever
 // appeared once.
 
+import { motion } from "framer-motion";
 import {
   SettlementCard,
   FeeCard,
@@ -15,6 +16,8 @@ import {
   type ConfirmationCharge,
   type SettlementPreview,
 } from "./swapReview";
+import { SPRING_DEFAULT, usePrefersReducedMotion } from "@/lib/motion";
+import Button from "@/components/ui/Button";
 
 export default function SwapRecapModal({
   otherUserName,
@@ -38,11 +41,23 @@ export default function SwapRecapModal({
   confirmationCharge: ConfirmationCharge;
   onClose: () => void;
 }) {
+  const reducedMotion = usePrefersReducedMotion();
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div
+    <motion.div
+      className="glass-scrim fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={reducedMotion ? { duration: 0.15 } : SPRING_DEFAULT}
+    >
+      <motion.div
         className="scrollbar-hide max-h-[88vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
+        animate={reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+        exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
+        transition={reducedMotion ? { duration: 0.15 } : SPRING_DEFAULT}
       >
         <h2 className="font-display text-xl font-bold text-gray-900">Swap details</h2>
         <p className="mt-1 text-sm text-gray-500">
@@ -50,19 +65,22 @@ export default function SwapRecapModal({
         </p>
 
         <StayDatesCard stayFrom={stayFrom} stayTo={stayTo} />
-        <SettlementCard preview={settlement} isMePaying={isMePaying} otherUserName={otherUserName} tense="final" />
+        <SettlementCard
+          preview={settlement}
+          isMePaying={isMePaying}
+          otherUserName={otherUserName}
+          tense="final"
+          stayFrom={stayFrom}
+          stayTo={stayTo}
+        />
         <FeeCard charge={confirmationCharge} otherUserName={otherUserName} />
         <ObligationsCard otherUserName={otherUserName} />
         <LegalNextStepCard stayFrom={stayFrom} stayTo={stayTo} otherUserName={otherUserName} />
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-5 w-full rounded-full bg-gradient-to-r from-bloom to-riviera px-4 py-3 text-sm font-medium text-white shadow-lg shadow-bloom/30"
-        >
+        <Button onClick={onClose} className="mt-5 w-full !py-3 text-sm">
           Close
-        </button>
-      </div>
-    </div>
+        </Button>
+      </motion.div>
+    </motion.div>
   );
 }

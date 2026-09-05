@@ -7,10 +7,22 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { AnimatePresence } from "framer-motion";
 import RatingPrompt from "./RatingPrompt";
 import ConfirmReviewModal from "./ConfirmReviewModal";
 import SwapRecapModal from "./SwapRecapModal";
-import { formatDate, formatEuros, previewLine, type ConfirmationCharge, type SettlementPreview } from "./swapReview";
+import { paymentMethodLabel } from "@/components/PaymentMethodEditor";
+import { estimatedTotalCents } from "@/lib/pricing";
+import {
+  DepositEstimateCard,
+  formatDate,
+  formatEuros,
+  previewLine,
+  stayDurationDays,
+  type ConfirmationCharge,
+  type DepositRate,
+  type SettlementPreview,
+} from "./swapReview";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -23,42 +35,27 @@ interface CancellationRecord {
   cancelledByMe: boolean;
   cancelledAt: string;
   daysNotice: number;
-  outcome: "REFUNDED" | "FORFEITED";
+  outcome: "REFUNDED" | "FORFEITED" | "OUR_FAULT";
   forfeitedCents: number;
+  // Paid out by manual bank transfer, not automatically — see
+  // ForfeiturePayout model comment and /api/admin.
   myPayoutStatus: "PENDING" | "PAID" | null;
-  needsPayoutOnboarding: boolean;
-  payoutLastAttemptAt: string | null;
+  myPayoutReference: string | null;
 }
 
-// Matches SUPPORTED_COUNTRIES in /api/user/payouts/onboard.
-const PAYOUT_COUNTRIES = [
-  { code: "DE", label: "Germany" },
-  { code: "FR", label: "France" },
-  { code: "IT", label: "Italy" },
-  { code: "ES", label: "Spain" },
-  { code: "PT", label: "Portugal" },
-  { code: "NL", label: "Netherlands" },
-  { code: "BE", label: "Belgium" },
-  { code: "AT", label: "Austria" },
-  { code: "CH", label: "Switzerland" },
-  { code: "IE", label: "Ireland" },
-  { code: "DK", label: "Denmark" },
-  { code: "SE", label: "Sweden" },
-  { code: "FI", label: "Finland" },
-  { code: "PL", label: "Poland" },
-  { code: "CZ", label: "Czechia" },
-  { code: "HU", label: "Hungary" },
-  { code: "GR", label: "Greece" },
-  { code: "LU", label: "Luxembourg" },
-  { code: "GB", label: "United Kingdom" },
-];
-
 type Pricing =
-  | { kind: "PAID"; ownerPricePerDayCents: number | null; negotiatedPricePerDayCents: number | null }
+  | {
+      kind: "PAID";
+      ownerPricePerDayCents: number | null;
+      ownerPricePerMonthCents: number | null;
+      negotiatedPricePerDayCents: number | null;
+    }
   | {
       kind: "MUTUAL";
       myPricePerDayCents: number | null;
+      myPricePerMonthCents: number | null;
       otherPricePerDayCents: number | null;
+      otherPricePerMonthCents: number | null;
       myNegotiatedPricePerDayCents: number | null;
       otherNegotiatedPricePerDayCents: number | null;
     };
@@ -75,7 +72,9 @@ interface MatchDetail {
   confirmedByMe: boolean;
   confirmedByOther: boolean;
   otherUserName: string;
+  otherPaymentMethod: string | null;
   otherPaymentHandle: string | null;
+  otherPaymentHandleAccountName: string | null;
   isPayer: boolean | null;
   windowFrom: string;
   windowTo: string;
@@ -84,6 +83,8 @@ interface MatchDetail {
   settlementIsMePaying: boolean;
   settlementMarkedPaidByPayer: boolean;
   settlementConfirmedReceivedByPayee: boolean;
+  settlementReminderStage: "DUE" | "OVERDUE_3D" | "OVERDUE_7D" | null;
+  settlementDisputeReported: boolean;
   confirmationCharge: ConfirmationCharge;
   myRefundableStatus: "PENDING" | "REFUNDED" | "FORFEITED";
   otherRefundableStatus: "PENDING" | "REFUNDED" | "FORFEITED";
@@ -91,6 +92,9 @@ interface MatchDetail {
   cancellation: CancellationRecord | null;
   completedProcessedAt: string | null;
   ratingWindowClosesAt: string | null;
+  canReportNoShow: boolean;
+  noShowReported: boolean;
+  noShowReportedByMe: boolean;
 }
 
 function toDateInputValue(iso: string) {
@@ -105,6 +109,12 @@ function daysBetween(fromStr: string, toStr: string): number | null {
   const toDate = new Date(toStr);
   if (!(toDate.getTime() > fromDate.getTime())) return null;
   return Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
+// Shown as the price input's placeholder so it's clear what actually gets
+// used if the field is left blank — that's the listed price, not nothing.
+function listedPricePlaceholder(cents: number | null): string {
+  return cents != null ? `Listed price: ${cents / 100} euros` : "Listed price";
 }
 
 function parseEurosInputToCents(input: string): number | null {
@@ -133,22 +143,58 @@ function computeDraftPreview(
   if (days == null) return null;
 
   if (pricing.kind === "PAID") {
-    const rate = parseEurosInputToCents(paidPriceInput) ?? pricing.ownerPricePerDayCents;
+    const typedRate = parseEurosInputToCents(paidPriceInput);
+    const rate = typedRate ?? pricing.ownerPricePerDayCents;
     if (rate == null) return null;
+    // A typed-in rate is an explicit day-rate override, same as a negotiated
+    // one server-side — only the listed rate prices off the monthly rate.
+    const monthlyRate = typedRate != null ? null : pricing.ownerPricePerMonthCents;
     // The flat owner is never the one paying — only the side who liked/
     // accepted one-directionally is.
-    return { amountCents: rate * days, iAmPaying: isPayer === true };
+    return { amountCents: estimatedTotalCents(rate, days, monthlyRate), iAmPaying: isPayer === true };
   }
 
-  const myRate = parseEurosInputToCents(myPriceInput) ?? pricing.myPricePerDayCents;
-  const otherRate = parseEurosInputToCents(otherPriceInput) ?? pricing.otherPricePerDayCents;
+  const typedMyRate = parseEurosInputToCents(myPriceInput);
+  const typedOtherRate = parseEurosInputToCents(otherPriceInput);
+  const myRate = typedMyRate ?? pricing.myPricePerDayCents;
+  const otherRate = typedOtherRate ?? pricing.otherPricePerDayCents;
   if (myRate == null || otherRate == null) return null;
-  const myTotal = myRate * days;
-  const otherTotal = otherRate * days;
+  const myMonthlyRate = typedMyRate != null ? null : pricing.myPricePerMonthCents;
+  const otherMonthlyRate = typedOtherRate != null ? null : pricing.otherPricePerMonthCents;
+  const myTotal = estimatedTotalCents(myRate, days, myMonthlyRate);
+  const otherTotal = estimatedTotalCents(otherRate, days, otherMonthlyRate);
   if (myTotal === otherTotal) return { amountCents: 0, iAmPaying: false };
   // Whoever's OWN flat is worth more is owed the difference — see
   // matchValidation.ts — so if MY flat is pricier, the OTHER side pays me.
   return { amountCents: Math.abs(myTotal - otherTotal), iAmPaying: myTotal < otherTotal };
+}
+
+// The day rate(s) actually at stake for a suggested deposit (see
+// DepositEstimateCard): the owner's flat for a PAID stay (only the payer
+// occupies anywhere), both flats for a MUTUAL swap. A typed draft rate wins
+// over a negotiated one, which wins over the listed price — same precedence
+// as computeDraftPreview, so the deposit estimate never disagrees with the
+// settlement preview shown right above it.
+function currentDayRates(
+  pricing: Pricing,
+  otherUserName: string,
+  paidPriceInput = "",
+  myPriceInput = "",
+  otherPriceInput = ""
+): DepositRate[] {
+  if (pricing.kind === "PAID") {
+    const typed = parseEurosInputToCents(paidPriceInput);
+    const rate = typed ?? pricing.negotiatedPricePerDayCents ?? pricing.ownerPricePerDayCents;
+    return rate != null ? [{ label: `${otherUserName}'s flat`, pricePerDayCents: rate }] : [];
+  }
+  const typedMy = parseEurosInputToCents(myPriceInput);
+  const typedOther = parseEurosInputToCents(otherPriceInput);
+  const myRate = typedMy ?? pricing.myNegotiatedPricePerDayCents ?? pricing.myPricePerDayCents;
+  const otherRate = typedOther ?? pricing.otherNegotiatedPricePerDayCents ?? pricing.otherPricePerDayCents;
+  const rates: DepositRate[] = [];
+  if (myRate != null) rates.push({ label: "Your flat", pricePerDayCents: myRate });
+  if (otherRate != null) rates.push({ label: `${otherUserName}'s flat`, pricePerDayCents: otherRate });
+  return rates;
 }
 
 export default function TripDetails({ matchId }: { matchId: string }) {
@@ -163,34 +209,53 @@ export default function TripDetails({ matchId }: { matchId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [switchingToMutual, setSwitchingToMutual] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showRecap, setShowRecap] = useState(false);
   const [settlementBusy, setSettlementBusy] = useState(false);
-  const [payoutCountry, setPayoutCountry] = useState("DE");
-  const [payoutBusy, setPayoutBusy] = useState(false);
+  const [confirmingNoShow, setConfirmingNoShow] = useState(false);
+  const [noShowBusy, setNoShowBusy] = useState(false);
+  const [disputeBusy, setDisputeBusy] = useState(false);
+  const [disputeNote, setDisputeNote] = useState("");
+  const [showDisputeForm, setShowDisputeForm] = useState(false);
   const checkoutNotice = searchParams.get("confirm"); // "success" | "cancelled" | null, back from Stripe
-  const payoutNotice = searchParams.get("payout"); // "onboarded" | null, back from Stripe Connect onboarding
 
-  async function startPayoutOnboarding() {
-    setPayoutBusy(true);
+  async function reportNoShow() {
+    setNoShowBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/user/payouts/onboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ country: payoutCountry, returnTo: matchId }),
-      });
+      const res = await fetch(`/api/matches/${matchId}/report-no-show`, { method: "POST" });
       const data = await res.json();
-      if (!res.ok || !data?.url) {
-        setError(data?.error ?? "Could not start payout setup.");
-        setPayoutBusy(false);
+      if (!res.ok) {
+        setError(data?.error ?? "Could not report this.");
         return;
       }
-      window.location.href = data.url;
-    } catch {
-      setError("Could not start payout setup. Please try again.");
-      setPayoutBusy(false);
+      setConfirmingNoShow(false);
+      load(false);
+    } finally {
+      setNoShowBusy(false);
+    }
+  }
+
+  async function reportSettlementProblem() {
+    setDisputeBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/matches/${matchId}/settlement/report-problem`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: disputeNote }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error ?? "Could not report this.");
+        return;
+      }
+      setShowDisputeForm(false);
+      load(false);
+    } finally {
+      setDisputeBusy(false);
     }
   }
 
@@ -269,6 +334,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
         setError(data?.error ?? "Could not switch to a mutual swap.");
         return;
       }
+      setSwitchingToMutual(false);
       load(true);
     } finally {
       setBusy(false);
@@ -316,14 +382,10 @@ export default function TripDetails({ matchId }: { matchId: string }) {
 
   if (detail.status === "CANCELLED") {
     const c = detail.cancellation;
+    // OUR_FAULT rows' cancelledByMe isn't meaningful — see the void-our-fault
+    // route comment — so it's branched on first, before REFUNDED/FORFEITED.
     return (
       <div className="border-b bg-gray-50 p-5 text-sm">
-        {payoutNotice === "onboarded" && (
-          <p className="mb-3 rounded-lg bg-riviera/10 px-3 py-2 text-xs font-medium text-riviera-strong">
-            Payout setup complete. If you're owed money, it's on its way, refresh in a moment if it doesn't
-            update automatically.
-          </p>
-        )}
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg">
             🚫
@@ -331,7 +393,11 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Cancelled</p>
             <p className="font-display text-lg font-bold text-gray-800">
-              {c ? `${c.cancelledByMe ? "You" : detail.otherUserName} cancelled this swap` : "This swap was cancelled"}
+              {c?.outcome === "OUR_FAULT"
+                ? "StudSwap cancelled this"
+                : c
+                  ? `${c.cancelledByMe ? "You" : detail.otherUserName} cancelled this swap`
+                  : "This swap was cancelled"}
             </p>
           </div>
         </div>
@@ -339,14 +405,23 @@ export default function TripDetails({ matchId }: { matchId: string }) {
         {c && (
           <div className="mt-3 space-y-2">
             <p className="text-xs text-gray-500">
-              Cancelled {formatDate(c.cancelledAt)},{" "}
-              {c.daysNotice >= 0
-                ? `${Math.floor(c.daysNotice)} day${Math.floor(c.daysNotice) === 1 ? "" : "s"} before the stay was due to start`
-                : "after the stay was due to start"}
+              Cancelled {formatDate(c.cancelledAt)}
+              {c.outcome !== "OUR_FAULT" &&
+                `, ${
+                  c.daysNotice >= 0
+                    ? `${Math.floor(c.daysNotice)} day${Math.floor(c.daysNotice) === 1 ? "" : "s"} before the stay was due to start`
+                    : "after the stay was due to start"
+                }`}
             </p>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-4">
-              {c.cancelledByMe ? (
+              {c.outcome === "OUR_FAULT" ? (
+                <p className="text-gray-700">
+                  This couldn't go ahead because of an error on our side. Your full{" "}
+                  {formatEuros(detail.confirmationCharge.totalCents)} confirmation charge, including the service
+                  fee, was refunded to you.
+                </p>
+              ) : c.cancelledByMe ? (
                 c.outcome === "REFUNDED" ? (
                   <p className="text-gray-700">
                     That's more than 7 days' notice, so your {formatEuros(detail.confirmationCharge.refundableCents)}{" "}
@@ -375,55 +450,30 @@ export default function TripDetails({ matchId }: { matchId: string }) {
                     {formatEuros(c.forfeitedCents)} refundable portion was forfeited to you instead of refunded to
                     them.
                   </p>
-                  {c.myPayoutStatus === "PENDING" && c.needsPayoutOnboarding && (
-                    <div className="mt-3 rounded-xl bg-riviera/5 p-3">
-                      <p className="text-xs text-gray-700">
-                        Set up payouts to receive it. This is a quick Stripe form (bank details, ID), one time
-                        only.
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <select
-                          value={payoutCountry}
-                          onChange={(e) => setPayoutCountry(e.target.value)}
-                          className="rounded-lg border border-gray-300 px-2 py-1.5 text-xs"
-                        >
-                          {PAYOUT_COUNTRIES.map((country) => (
-                            <option key={country.code} value={country.code}>
-                              {country.label}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={startPayoutOnboarding}
-                          disabled={payoutBusy}
-                          className="rounded-full bg-riviera px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                        >
-                          {payoutBusy ? "Redirecting…" : `Set up payouts to get ${formatEuros(c.forfeitedCents)}`}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {c.myPayoutStatus === "PENDING" && !c.needsPayoutOnboarding && (
+                  {c.myPayoutStatus === "PENDING" && (
                     <p className="mt-2 text-xs text-amber-700">
-                      Your payout account is set up.{" "}
-                      {c.payoutLastAttemptAt
-                        ? `We last tried sending it on ${formatDate(c.payoutLastAttemptAt)}.`
-                        : "We're sending it now."}{" "}
-                      This can take a few days to arrive while funds clear. We'll keep retrying automatically, no
-                      action needed from you.
+                      We owe you {formatEuros(c.forfeitedCents)} as compensation, paid by bank transfer to the
+                      payment details on your profile, usually within a few days. No action needed from you.
                     </p>
                   )}
                   {c.myPayoutStatus === "PAID" && (
-                    <p className="mt-2 text-xs text-green-700">This has already been paid out to you.</p>
+                    <p className="mt-2 text-xs text-green-700">
+                      This has already been paid out to you{c.myPayoutReference ? ` (ref: ${c.myPayoutReference})` : ""}.
+                    </p>
                   )}
                 </>
               )}
-              <p className="mt-2 text-xs text-gray-400">
-                Either way, nobody's {formatEuros(detail.confirmationCharge.serviceFeeCents)} service fee is
-                refunded, it's non-refundable from the moment it's charged.
-              </p>
+              {c.outcome !== "OUR_FAULT" && (
+                <p className="mt-2 text-xs text-gray-400">
+                  Either way, nobody's {formatEuros(detail.confirmationCharge.serviceFeeCents)} service fee is
+                  refunded, it's non-refundable from the moment it's charged.
+                </p>
+              )}
             </div>
+            <p className="text-xs text-gray-400">
+              Any money you'd already paid each other directly is between the two of you, that's unaffected by this
+              cancellation, StudSwap can't recover it.
+            </p>
             {error && <p className="text-xs text-red-600">{error}</p>}
           </div>
         )}
@@ -487,14 +537,41 @@ export default function TripDetails({ matchId }: { matchId: string }) {
   // switch this to a real swap, not the payer, who already opted into
   // paying one-directionally and may not want to offer their own flat.
   const switchToMutualButton = detail.type === "PAID" && detail.status === "PENDING" && detail.isPayer === false && (
-    <button
-      type="button"
-      onClick={switchToMutual}
-      disabled={busy}
-      className="text-left text-xs font-medium text-white/90 underline decoration-white/40 underline-offset-2 disabled:opacity-50 hover:text-white"
-    >
-      Prefer to swap flats instead of paying? Switch to a mutual match
-    </button>
+    <div>
+      {switchingToMutual ? (
+        <div className="rounded-2xl bg-white/95 p-3 shadow-inner">
+          <p className="text-xs text-gray-700">
+            Switch this to a mutual swap? {detail.otherUserName} will stay at your flat too, instead of just
+            paying to stay at theirs.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={switchToMutual}
+              disabled={busy}
+              className="rounded-full bg-riviera-strong px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            >
+              Yes, switch to swap
+            </button>
+            <button
+              type="button"
+              onClick={() => setSwitchingToMutual(false)}
+              className="rounded-full px-3 py-1.5 text-xs font-medium text-gray-500"
+            >
+              Never mind
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setSwitchingToMutual(true)}
+          className="rounded-full border border-white/40 px-4 py-2 text-xs font-medium text-white"
+        >
+          Switch to swap
+        </button>
+      )}
+    </div>
   );
 
   const confirmedPill = (label: string, confirmed: boolean) => (
@@ -521,21 +598,32 @@ export default function TripDetails({ matchId }: { matchId: string }) {
     </button>
   );
 
-  const recapModal = showRecap && detail.stayFrom && detail.stayTo && (
-    <SwapRecapModal
-      otherUserName={detail.otherUserName}
-      isMePaying={detail.settlementIsMePaying}
-      stayFrom={detail.stayFrom}
-      stayTo={detail.stayTo}
-      isComplete={detail.completedProcessedAt != null}
-      settlement={detail.settlement}
-      confirmationCharge={detail.confirmationCharge}
-      onClose={() => setShowRecap(false)}
-    />
+  const recapModal = (
+    <AnimatePresence>
+      {showRecap && detail.stayFrom && detail.stayTo && (
+        <SwapRecapModal
+          key="recap"
+          otherUserName={detail.otherUserName}
+          isMePaying={detail.settlementIsMePaying}
+          stayFrom={detail.stayFrom}
+          stayTo={detail.stayTo}
+          isComplete={detail.completedProcessedAt != null}
+          settlement={detail.settlement}
+          confirmationCharge={detail.confirmationCharge}
+          onClose={() => setShowRecap(false)}
+        />
+      )}
+    </AnimatePresence>
   );
 
   if (detail.status === "VALIDATED") {
-    const line = previewLine(detail.settlement, detail.settlementIsMePaying, detail.otherUserName, "final");
+    const line = previewLine(
+      detail.settlement,
+      detail.settlementIsMePaying,
+      detail.otherUserName,
+      "final",
+      detail.stayFrom && detail.stayTo ? stayDurationDays(detail.stayFrom, detail.stayTo) : null
+    );
     const settlementOwed = detail.settlement && detail.settlement.amountCents > 0 && detail.settlement.payerId;
     const settlementActionButton =
       settlementOwed &&
@@ -579,7 +667,22 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           <div className="mt-3">{line && <p className="text-white/90">{line}</p>}</div>
           {detail.otherPaymentHandle && (
             <p className="mt-1 rounded-xl bg-white/10 px-3 py-2 text-xs text-white/90">
-              {detail.otherUserName}'s payment details: <strong>{detail.otherPaymentHandle}</strong>
+              {detail.otherUserName}'s payment details:{" "}
+              <strong>
+                {paymentMethodLabel(detail.otherPaymentMethod)}: {detail.otherPaymentHandle}
+                {detail.otherPaymentHandleAccountName ? ` (${detail.otherPaymentHandleAccountName})` : ""}
+              </strong>
+              . This goes directly between the two of you, StudSwap doesn't handle it and can't recover it if
+              something goes wrong.
+            </p>
+          )}
+          {settlementOwed && detail.settlementReminderStage && (
+            <p className="mt-1 rounded-xl bg-white/10 px-3 py-2 text-xs text-white/90">
+              {detail.settlementReminderStage === "DUE" && "This payment is now due."}
+              {detail.settlementReminderStage === "OVERDUE_3D" &&
+                "Still showing as unpaid a few days on. Worth checking in."}
+              {detail.settlementReminderStage === "OVERDUE_7D" &&
+                "Still showing as unpaid a week on. If something's actually wrong, report it below."}
             </p>
           )}
           {settlementActionButton && <div className="mt-2">{settlementActionButton}</div>}
@@ -587,6 +690,93 @@ export default function TripDetails({ matchId }: { matchId: string }) {
             <p className="mt-1 text-xs text-white/70">
               {detail.settlementMarkedPaidByPayer ? "Marked paid. " : ""}
               {detail.settlementConfirmedReceivedByPayee ? "Confirmed received." : ""}
+            </p>
+          )}
+          {settlementOwed && !detail.settlementDisputeReported && (
+            <div className="mt-1">
+              {showDisputeForm ? (
+                <div className="rounded-xl bg-white/95 p-3">
+                  <textarea
+                    autoFocus
+                    rows={2}
+                    maxLength={500}
+                    value={disputeNote}
+                    onChange={(e) => setDisputeNote(e.target.value)}
+                    placeholder="What happened? (optional)"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-900"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={reportSettlementProblem}
+                      disabled={disputeBusy}
+                      className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                    >
+                      Report problem
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDisputeForm(false)}
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-gray-500"
+                    >
+                      Never mind
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowDisputeForm(true)}
+                  className="text-xs font-medium text-white/70 underline decoration-white/40 underline-offset-2 hover:text-white"
+                >
+                  This payment didn't happen as expected
+                </button>
+              )}
+            </div>
+          )}
+          {detail.settlementDisputeReported && (
+            <p className="mt-1 text-xs text-white/70">Reported. We can't recover this money, but it's on file.</p>
+          )}
+          {detail.canReportNoShow && (
+            <div className="mt-2">
+              {confirmingNoShow ? (
+                <div className="rounded-xl bg-white/95 p-3">
+                  <p className="text-xs text-gray-700">
+                    Report that {detail.otherUserName} never gave you access or never turned up? Their refundable
+                    portion will be forfeited to you instead of refunded to them.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={reportNoShow}
+                      disabled={noShowBusy}
+                      className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                    >
+                      Yes, report no-show
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingNoShow(false)}
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-gray-500"
+                    >
+                      Never mind
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingNoShow(true)}
+                  className="text-xs font-medium text-white/70 underline decoration-white/40 underline-offset-2 hover:text-white"
+                >
+                  {detail.otherUserName} never gave you access?
+                </button>
+              )}
+            </div>
+          )}
+          {detail.noShowReported && (
+            <p className="mt-2 text-xs text-white/70">
+              {detail.noShowReportedByMe ? "You reported this. " : ""}No-show reported for this stay.
             </p>
           )}
           {error && (
@@ -612,8 +802,14 @@ export default function TripDetails({ matchId }: { matchId: string }) {
     ? { amountCents: draftPreviewRaw.amountCents, payerId: draftPreviewRaw.iAmPaying ? "me" : "other" }
     : null;
   const draftIsMePaying = draftPreviewRaw?.iAmPaying ?? false;
-  const draftLine = previewLine(draftPreview, draftIsMePaying, detail.otherUserName, "conditional");
-  const proposedLine = previewLine(detail.settlement, detail.settlementIsMePaying, detail.otherUserName, "final");
+  const draftLine = previewLine(draftPreview, draftIsMePaying, detail.otherUserName, "conditional", draftDays);
+  const proposedLine = previewLine(
+    detail.settlement,
+    detail.settlementIsMePaying,
+    detail.otherUserName,
+    "final",
+    detail.stayFrom && detail.stayTo ? stayDurationDays(detail.stayFrom, detail.stayTo) : null
+  );
 
   return (
     <div className="border-b bg-gradient-to-br from-riviera-strong via-bloom to-spritz p-5 text-sm text-white">
@@ -644,7 +840,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           {detail.type === "PAID" ? (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Negotiate a price/day (optional)
+                Negotiate a price/day
               </p>
               <input
                 type="number"
@@ -653,7 +849,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
                 max={1000}
                 value={paidPrice}
                 onChange={(e) => setPaidPrice(e.target.value)}
-                placeholder="Leave blank to use the listed price"
+                placeholder={listedPricePlaceholder(detail.pricing.kind === "PAID" ? detail.pricing.ownerPricePerDayCents : null)}
                 className="mt-1.5 w-full rounded-xl border-0 bg-white/95 px-2.5 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white sm:w-64"
               />
             </div>
@@ -664,7 +860,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
               </p>
               <p className="mt-0.5 text-xs text-white/60">
                 Leave either blank to use the listed price. This just settles what each flat is worth for the
-                fairness difference, StudSwap never charges it.
+                fairness difference.
               </p>
               <div className="mt-1.5 flex gap-2">
                 <div className="flex-1">
@@ -676,7 +872,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
                     max={1000}
                     value={myPrice}
                     onChange={(e) => setMyPrice(e.target.value)}
-                    placeholder="Listed price"
+                    placeholder={listedPricePlaceholder(detail.pricing.kind === "MUTUAL" ? detail.pricing.myPricePerDayCents : null)}
                     className="mt-0.5 w-full rounded-xl border-0 bg-white/95 px-2.5 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white"
                   />
                 </div>
@@ -689,7 +885,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
                     max={1000}
                     value={otherPrice}
                     onChange={(e) => setOtherPrice(e.target.value)}
-                    placeholder="Listed price"
+                    placeholder={listedPricePlaceholder(detail.pricing.kind === "MUTUAL" ? detail.pricing.otherPricePerDayCents : null)}
                     className="mt-0.5 w-full rounded-xl border-0 bg-white/95 px-2.5 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white"
                   />
                 </div>
@@ -697,6 +893,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
             </div>
           )}
           {draftDays != null && draftLine && <p className="text-white/90">{draftLine}</p>}
+          <DepositEstimateCard rates={currentDayRates(detail.pricing, detail.otherUserName, paidPrice, myPrice, otherPrice)} />
           <div className="mt-1 flex gap-2">
             <button
               type="button"
@@ -780,18 +977,22 @@ export default function TripDetails({ matchId }: { matchId: string }) {
       {error && (
         <p className="mt-3 rounded-lg bg-white/95 px-3 py-2 text-xs font-medium text-red-700">{error}</p>
       )}
-      {showConfirmModal && detail.stayFrom && detail.stayTo && (
-        <ConfirmReviewModal
-          matchId={matchId}
-          otherUserName={detail.otherUserName}
-          isMePaying={detail.settlementIsMePaying}
-          stayFrom={detail.stayFrom}
-          stayTo={detail.stayTo}
-          settlement={detail.settlement}
-          confirmationCharge={detail.confirmationCharge}
-          onClose={() => setShowConfirmModal(false)}
-        />
-      )}
+      <AnimatePresence>
+        {showConfirmModal && detail.stayFrom && detail.stayTo && (
+          <ConfirmReviewModal
+            key="confirm"
+            matchId={matchId}
+            otherUserName={detail.otherUserName}
+            isMePaying={detail.settlementIsMePaying}
+            stayFrom={detail.stayFrom}
+            stayTo={detail.stayTo}
+            settlement={detail.settlement}
+            confirmationCharge={detail.confirmationCharge}
+            depositRates={currentDayRates(detail.pricing, detail.otherUserName)}
+            onClose={() => setShowConfirmModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

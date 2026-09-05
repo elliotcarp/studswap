@@ -6,6 +6,7 @@
 // decide a swipe.
 
 import type { ProfileCardData, RatingSummary } from "@/types";
+import Surface from "@/components/ui/Surface";
 
 function formatDateRange(fromIso: string, toIso: string) {
   const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
@@ -33,6 +34,14 @@ function Photo({ url, badge }: { url: string; badge?: React.ReactNode }) {
         className="aspect-[4/5] w-full select-none object-cover"
       />
       {badge}
+    </div>
+  );
+}
+
+function FlatVideo({ url }: { url: string }) {
+  return (
+    <div className="mx-3 my-3 overflow-hidden rounded-2xl bg-black shadow-md">
+      <video src={url} controls playsInline className="aspect-video w-full" />
     </div>
   );
 }
@@ -76,9 +85,9 @@ function RatingStatsBlock({ ratingSummary }: { ratingSummary: RatingSummary }) {
     );
   }
   return (
-    <div className="mx-3 mt-3 rounded-2xl bg-white p-4 shadow-md">
+    <Surface variant="tinted" className="mx-3 mt-3 p-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-gray-500">
+        <p className="text-sm font-semibold text-gray-600">
           {ratingSummary.completedSwapCount} completed swap{ratingSummary.completedSwapCount === 1 ? "" : "s"}
         </p>
         <p className="font-mono text-lg font-bold text-spritz-text">★ {formatStars(ratingSummary.overallAvg)}</p>
@@ -97,16 +106,16 @@ function RatingStatsBlock({ ratingSummary }: { ratingSummary: RatingSummary }) {
           <p className="text-xs text-gray-500">Would swap again</p>
         </div>
       </div>
-    </div>
+    </Surface>
   );
 }
 
 function PromptCard({ question, answer }: { question: string; answer: string }) {
   return (
-    <div className="mx-3 my-3 rounded-2xl bg-white p-4 shadow-md">
-      <p className="text-sm font-semibold text-gray-500">{question}</p>
+    <Surface className="mx-3 my-3 p-4">
+      <p className="text-sm font-semibold text-bloom-text">{question}</p>
       <p className="mt-1 text-lg">{answer}</p>
-    </div>
+    </Surface>
   );
 }
 
@@ -126,15 +135,18 @@ export default function ProfileCard({
   // a fuller stats block with all rating dimensions.
   ratingDisplay?: "compact" | "full";
 }) {
-  // selfPhotoUrls first so the profile picture always leads the scroll.
-  const allPhotos = [...profile.selfPhotoUrls, ...profile.flatPhotoUrls];
+  // flatPhotoUrls first: the flat's cover photo leads the scroll (this is a
+  // flat-swap platform, so what leads the card is the place, not the
+  // person), then selfPhotoUrls. See PhotoGridEditor's "Cover photo" /
+  // "Profile picture" labels, which mark exactly these two slots.
+  const allPhotos = [...profile.flatPhotoUrls, ...profile.selfPhotoUrls];
   const photos = allPhotos.length > 0 ? allPhotos : ["https://placehold.co/600x800?text=No+photo"];
   const [firstPhoto, secondPhoto, thirdPhoto, ...restPhotos] = photos;
   const [prompt1, prompt2, prompt3, ...restPrompts] = profile.prompts;
 
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-2xl bg-gray-100 shadow-lg">
-      <div className="scrollbar-hide h-full overflow-y-auto">
+    <div className="absolute inset-0 overflow-hidden rounded-card bg-gradient-to-br from-riviera via-bloom to-spritz p-[2px] shadow-elevated [contain:paint]">
+      <div className="scrollbar-hide h-full overflow-y-auto rounded-card bg-gray-100">
         <Photo
           url={firstPhoto}
           badge={ratingDisplay === "compact" ? <RatingCompactBadge ratingSummary={profile.ratingSummary} /> : undefined}
@@ -142,7 +154,7 @@ export default function ProfileCard({
 
         {/* Ticket-stub data strip: the four things that decide a swipe,
             always visible, never buried in the badge row below. */}
-        <div className="mx-3 -mt-1 rounded-2xl bg-white shadow-md">
+        <Surface variant="elevated" className="mx-3 -mt-1">
           <div
             aria-hidden
             className="h-3 bg-gray-100"
@@ -169,10 +181,19 @@ export default function ProfileCard({
             <div className="mt-2 flex items-center justify-between border-t border-dashed border-gray-200 pt-2 font-mono text-xs text-gray-600">
               <span>{formatDateRange(profile.availableFrom, profile.availableTo)}</span>
               <span>Fits {profile.accommodates}</span>
-              <span className="text-sm font-bold text-spritz-text">€{(Number(profile.pricePerDayCents) / 100).toFixed(0)}/day</span>
+              <span className="text-right">
+                <span className="block text-sm font-bold text-spritz-text">
+                  €{(Number(profile.pricePerDayCents) / 100).toFixed(0)}/day
+                </span>
+                {profile.pricePerMonthCents && (
+                  <span className="block text-[11px] text-gray-400">
+                    €{(Number(profile.pricePerMonthCents) / 100).toFixed(0)}/month
+                  </span>
+                )}
+              </span>
             </div>
           </div>
-        </div>
+        </Surface>
 
         {ratingDisplay === "full" && <RatingStatsBlock ratingSummary={profile.ratingSummary} />}
 
@@ -181,7 +202,9 @@ export default function ProfileCard({
             {profile.program} · {profile.university}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge>{profile.yearOfStudy}</Badge>
+            <span className="rounded-full bg-gradient-to-r from-riviera/15 to-bloom/15 px-3 py-1 text-xs font-semibold text-riviera-strong">
+              {profile.yearOfStudy}
+            </span>
           </div>
           {profile.selfDescription && (
             <p className="mt-3 whitespace-pre-wrap text-base text-gray-700">{profile.selfDescription}</p>
@@ -198,17 +221,19 @@ export default function ProfileCard({
         ))}
 
         {profile.flatDescription && (
-          <div className="mx-3 my-3 rounded-2xl bg-white p-4 shadow-md">
-            <p className="text-sm font-semibold text-gray-500">About the flat</p>
+          <Surface className="mx-3 my-3 p-4">
+            <p className="text-sm font-semibold text-riviera">About the flat</p>
             <p className="mt-1 whitespace-pre-wrap text-base">{profile.flatDescription}</p>
-          </div>
+          </Surface>
         )}
 
+        {profile.flatVideoUrl && <FlatVideo url={profile.flatVideoUrl} />}
+
         {showAddress && profile.address && (
-          <div className="mx-3 my-3 rounded-2xl bg-riviera/5 p-4">
+          <Surface variant="tinted" className="mx-3 my-3 p-4">
             <p className="text-sm font-semibold text-riviera-strong">📍 Exact address</p>
             <p className="mt-1 text-base">{profile.address}</p>
-          </div>
+          </Surface>
         )}
 
         {restPhotos.map((url) => (
