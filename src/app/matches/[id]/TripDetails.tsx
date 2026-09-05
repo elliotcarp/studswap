@@ -856,11 +856,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           ) : (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Settle on a price for each flat (optional)
-              </p>
-              <p className="mt-0.5 text-xs text-white/60">
-                Leave either blank to use the listed price. This just settles what each flat is worth for the
-                fairness difference.
+                Settle a price for each flat
               </p>
               <div className="mt-1.5 flex gap-2">
                 <div className="flex-1">
@@ -943,6 +939,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
               </p>
             )}
           {proposedLine && <p className="text-white/90">{proposedLine}</p>}
+          <DepositEstimateCard rates={currentDayRates(detail.pricing, detail.otherUserName)} defaultOpen />
           <div className="flex flex-wrap gap-2">
             {confirmedPill("You", detail.confirmedByMe)}
             {confirmedPill(detail.otherUserName, detail.confirmedByOther)}

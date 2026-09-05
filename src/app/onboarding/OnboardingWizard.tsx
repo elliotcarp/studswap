@@ -242,8 +242,7 @@ const STEPS: StepDef[] = [
   {
     icon: "📅",
     title: "When's your flat available?",
-    subtitle:
-      "This is when YOUR flat is free for someone else to stay in it, not when you want to travel. You'll set your own trip dates separately when you browse other people's flats.",
+    subtitle: "This is when YOUR flat is free for someone else to stay in it.",
     render: (data, setField) => (
       <div className="flex flex-col gap-4">
         <div>
@@ -655,7 +654,11 @@ export default function OnboardingWizard({ initialProfile }: { initialProfile?: 
 
       <div className="flex items-center justify-between">
         {step.onSkip ? (
-          <button type="button" onClick={handleSkip} className="text-sm font-medium text-gray-400">
+          <button
+            type="button"
+            onClick={handleSkip}
+            className="text-sm font-semibold text-gray-600 underline underline-offset-2 active:scale-95"
+          >
             Skip for now
           </button>
         ) : (

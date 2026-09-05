@@ -180,7 +180,7 @@ export default function FilterPanel({
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/70">
               Your trip dates
-              <InfoTooltip text="When YOU want to go away. We'll show flats that are free during this window, not your own flat's availability." />
+              <InfoTooltip text="When you want to go away." />
             </p>
             <div className="mt-1.5 flex gap-2">
               <div className="flex-1">

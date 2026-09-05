@@ -36,8 +36,8 @@ export default function SwipeView({
   defaultTripFrom,
   defaultTripTo,
   myCity,
-  selfPhotoCount,
-  flatPhotoCount,
+  selfPhotoCount: initialSelfPhotoCount,
+  flatPhotoCount: initialFlatPhotoCount,
 }: {
   defaultTripFrom: string;
   defaultTripTo: string;
@@ -56,6 +56,24 @@ export default function SwipeView({
   const [profiles, setProfiles] = useState<ProfileCardData[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [match, setMatch] = useState<{ matchId: string; otherName: string; otherCity: string } | null>(null);
+  const [photoCounts, setPhotoCounts] = useState({
+    selfPhotoCount: initialSelfPhotoCount,
+    flatPhotoCount: initialFlatPhotoCount,
+  });
+
+  // The server-rendered initial counts above can go stale if photos were
+  // edited on /profile and the browser served this page back out of Next's
+  // client-side Router Cache — this re-fetches fresh on every mount (i.e.
+  // every time someone navigates here) so the banner below never shows a
+  // photo count that's already been fixed.
+  useEffect(() => {
+    fetch("/api/user/photo-counts")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => setPhotoCounts(data))
+      .catch(() => {
+        // Best-effort: keep showing the server-rendered counts on failure.
+      });
+  }, []);
 
   useEffect(() => {
     setProfiles(null);
@@ -107,7 +125,10 @@ export default function SwipeView({
         </Button>
       </div>
 
-      <ProfileCompletionBanner selfPhotoCount={selfPhotoCount} flatPhotoCount={flatPhotoCount} />
+      <ProfileCompletionBanner
+        selfPhotoCount={photoCounts.selfPhotoCount}
+        flatPhotoCount={photoCounts.flatPhotoCount}
+      />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
