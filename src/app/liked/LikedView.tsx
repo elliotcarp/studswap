@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import type { LikerSummary, MatchSummary } from "@/types";
 import MatchReveal from "@/components/MatchReveal";
@@ -15,6 +16,7 @@ import Button from "@/components/ui/Button";
 const EXPLAINER_SEEN_KEY = "studswap:seenLikedExplainer";
 
 export default function LikedView({ myCity }: { myCity: string }) {
+  const router = useRouter();
   const [likers, setLikers] = useState<LikerSummary[] | null>(null);
   // Already-accepted one-directional connections (PAID matches, either side
   // accepted): these never had a mutual swipe, so they stay here rather than
@@ -207,21 +209,32 @@ export default function LikedView({ myCity }: { myCity: string }) {
             <ul className="flex flex-col gap-2">
               {connections.map((conn) => (
                 <li key={conn.matchId}>
-                  <Surface className="flex items-center gap-3 p-3">
-                    <Link href={`/profile/${conn.otherUser.id}`} className="flex-shrink-0">
+                  <Surface
+                    className="flex items-center gap-3 p-3"
+                    onClick={() => router.push(`/matches/${conn.matchId}`)}
+                  >
+                    <Link
+                      href={`/profile/${conn.otherUser.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-shrink-0"
+                    >
                       <Avatar src={conn.otherUser.photoUrl} className="h-14 w-14 rounded-full" />
                     </Link>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/profile/${conn.otherUser.id}`} className="flex items-center gap-2">
+                      <Link
+                        href={`/profile/${conn.otherUser.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2"
+                      >
                         <p className="min-w-0 truncate font-medium">{conn.otherUser.name}</p>
                         <MatchStatusPill matchType={conn.matchType} isPayer={conn.isPayer} />
                       </Link>
-                      <Link href={`/matches/${conn.matchId}`} className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
                         <p className={`truncate text-sm ${conn.unread ? "font-semibold text-gray-900" : "text-gray-500"}`}>
                           {conn.lastMessage ?? "Say hi!"}
                         </p>
                         {conn.unread && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-spritz" />}
-                      </Link>
+                      </div>
                     </div>
                   </Surface>
                 </li>

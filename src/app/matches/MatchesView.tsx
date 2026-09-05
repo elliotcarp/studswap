@@ -1,10 +1,12 @@
 "use client";
 
-// Fetches GET /api/matches and renders the list. Photo/name -> /profile/[id];
-// the message row -> /matches/[id] to open the chat.
+// Fetches GET /api/matches and renders the list. The row itself opens the
+// chat at /matches/[id]; only the avatar and name opt out to /profile/[id]
+// instead (via stopPropagation so the row's own click doesn't also fire).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { MatchSummary } from "@/types";
 import MatchStatusPill from "@/components/MatchStatusPill";
 import Avatar from "@/components/Avatar";
@@ -13,6 +15,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import Surface from "@/components/ui/Surface";
 
 export default function MatchesView() {
+  const router = useRouter();
   const [matches, setMatches] = useState<MatchSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,16 +53,27 @@ export default function MatchesView() {
       <ul className="flex flex-col gap-2">
         {matches?.map((match) => (
           <li key={match.matchId}>
-            <Surface className="flex items-center gap-3 p-3">
-              <Link href={`/profile/${match.otherUser.id}`} className="flex-shrink-0">
+            <Surface
+              className="flex items-center gap-3 p-3"
+              onClick={() => router.push(`/matches/${match.matchId}`)}
+            >
+              <Link
+                href={`/profile/${match.otherUser.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex-shrink-0"
+              >
                 <Avatar src={match.otherUser.photoUrl} className="h-14 w-14 rounded-full" />
               </Link>
               <div className="min-w-0 flex-1">
-                <Link href={`/profile/${match.otherUser.id}`} className="flex items-center gap-2">
+                <Link
+                  href={`/profile/${match.otherUser.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2"
+                >
                   <p className="min-w-0 truncate font-medium">{match.otherUser.name}</p>
                   <MatchStatusPill matchType={match.matchType} isPayer={match.isPayer} />
                 </Link>
-                <Link href={`/matches/${match.matchId}`} className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5">
                   <p className={`truncate text-sm ${match.unread ? "font-semibold text-gray-900" : "text-gray-500"}`}>
                     {match.lastMessage ?? "Say hi!"}
                   </p>
@@ -67,7 +81,7 @@ export default function MatchesView() {
                       (fine as a large fill, not as an 8px mark), spritz has the
                       contrast this actually needs to be seen. */}
                   {match.unread && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-spritz" />}
-                </Link>
+                </div>
               </div>
             </Surface>
           </li>

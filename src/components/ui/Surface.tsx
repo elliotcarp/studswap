@@ -13,19 +13,26 @@ type SurfaceVariant = "flat" | "elevated" | "tinted";
 export default function Surface({
   variant = "flat",
   className,
+  onClick,
   children,
 }: {
   variant?: SurfaceVariant;
   className?: string;
+  // Optional: makes the whole surface clickable (e.g. a list row whose
+  // container should navigate somewhere while specific children inside it
+  // still link elsewhere — see MatchesView/LikedView).
+  onClick?: () => void;
   children: ReactNode;
 }) {
   return (
     <div
+      onClick={onClick}
       className={clsx(
         "rounded-card",
         variant === "flat" && "bg-white shadow-surface",
         variant === "elevated" && "bg-white shadow-elevated",
         variant === "tinted" && "bg-gradient-to-br from-riviera/10 via-bloom/5 to-spritz/10 shadow-surface",
+        onClick && "cursor-pointer",
         className
       )}
     >
