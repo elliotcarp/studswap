@@ -409,6 +409,7 @@ const STEPS: StepDef[] = [
       <VideoUploader value={data.flatVideoUrl} onChange={(url) => setField("flatVideoUrl", url)} />
     ),
     isValid: () => true,
+    onSkip: () => {},
   },
   {
     icon: "💬",

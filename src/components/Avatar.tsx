@@ -20,8 +20,13 @@ export default function Avatar({
     return <img src={src} alt={alt} className={clsx("object-cover", className)} />;
   }
   return (
-    <div className={clsx("flex items-center justify-center bg-gray-200 text-gray-400", className)}>
-      <UserRoundIcon className="h-3/5 w-3/5" />
+    <div
+      className={clsx(
+        "flex items-center justify-center bg-gradient-to-br from-riviera/20 to-bloom/20 text-riviera",
+        className
+      )}
+    >
+      <UserRoundIcon className="h-3/5 w-3/5" strokeWidth={1.5} />
     </div>
   );
 }

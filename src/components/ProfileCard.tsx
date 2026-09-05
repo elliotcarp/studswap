@@ -7,6 +7,7 @@
 
 import type { ProfileCardData, RatingSummary } from "@/types";
 import Surface from "@/components/ui/Surface";
+import { ImageIcon } from "@/components/icons";
 
 function formatDateRange(fromIso: string, toIso: string) {
   const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
@@ -33,6 +34,19 @@ function Photo({ url, badge }: { url: string; badge?: React.ReactNode }) {
         draggable={false}
         className="aspect-[4/5] w-full select-none object-cover"
       />
+      {badge}
+    </div>
+  );
+}
+
+// Rendered in the first photo slot when neither flat nor self photos have
+// been added yet, instead of an external placehold.co image, so this never
+// depends on a third-party host and always matches the app's own look.
+function NoPhotoPlaceholder({ badge }: { badge?: React.ReactNode }) {
+  return (
+    <div className="relative mx-3 my-3 flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-br from-riviera/20 to-bloom/20 text-riviera shadow-md">
+      <ImageIcon className="h-12 w-12" strokeWidth={1.5} />
+      <span className="text-sm font-medium">No photos yet</span>
       {badge}
     </div>
   );
@@ -140,17 +154,22 @@ export default function ProfileCard({
   // person), then selfPhotoUrls. See PhotoGridEditor's "Cover photo" /
   // "Profile picture" labels, which mark exactly these two slots.
   const allPhotos = [...profile.flatPhotoUrls, ...profile.selfPhotoUrls];
-  const photos = allPhotos.length > 0 ? allPhotos : ["https://placehold.co/600x800?text=No+photo"];
-  const [firstPhoto, secondPhoto, thirdPhoto, ...restPhotos] = photos;
+  const [firstPhoto, secondPhoto, thirdPhoto, ...restPhotos] = allPhotos;
   const [prompt1, prompt2, prompt3, ...restPrompts] = profile.prompts;
 
   return (
     <div className="absolute inset-0 overflow-hidden rounded-card bg-gradient-to-br from-riviera via-bloom to-spritz p-[2px] shadow-elevated [contain:paint]">
       <div className="scrollbar-hide h-full overflow-y-auto rounded-card bg-gray-100">
-        <Photo
-          url={firstPhoto}
-          badge={ratingDisplay === "compact" ? <RatingCompactBadge ratingSummary={profile.ratingSummary} /> : undefined}
-        />
+        {firstPhoto ? (
+          <Photo
+            url={firstPhoto}
+            badge={ratingDisplay === "compact" ? <RatingCompactBadge ratingSummary={profile.ratingSummary} /> : undefined}
+          />
+        ) : (
+          <NoPhotoPlaceholder
+            badge={ratingDisplay === "compact" ? <RatingCompactBadge ratingSummary={profile.ratingSummary} /> : undefined}
+          />
+        )}
 
         {/* Ticket-stub data strip: the four things that decide a swipe,
             always visible, never buried in the badge row below. */}

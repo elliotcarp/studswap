@@ -891,7 +891,6 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           {draftDays != null && draftLine && <p className="text-white/90">{draftLine}</p>}
           <DepositEstimateCard
             rates={currentDayRates(detail.pricing, detail.otherUserName, paidPrice, myPrice, otherPrice)}
-            defaultOpen
           />
           <div className="mt-1 flex gap-2">
             <button
@@ -939,7 +938,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
               </p>
             )}
           {proposedLine && <p className="text-white/90">{proposedLine}</p>}
-          <DepositEstimateCard rates={currentDayRates(detail.pricing, detail.otherUserName)} defaultOpen />
+          <DepositEstimateCard rates={currentDayRates(detail.pricing, detail.otherUserName)} />
           <div className="flex flex-wrap gap-2">
             {confirmedPill("You", detail.confirmedByMe)}
             {confirmedPill(detail.otherUserName, detail.confirmedByOther)}
