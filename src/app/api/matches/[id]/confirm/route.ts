@@ -61,7 +61,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const iAmOwedMoney = settlementAmountCents > 0 && settlementPayerId != null && settlementPayerId !== userId;
   if (iAmOwedMoney && (!user?.paymentMethod || !user?.paymentHandle)) {
     return NextResponse.json(
-      { error: "Add how you'd like to be paid on your profile before confirming — the other side needs it." },
+      { error: "Add how you'd like to be paid on your profile before confirming, the other side needs it." },
       { status: 400 }
     );
   }

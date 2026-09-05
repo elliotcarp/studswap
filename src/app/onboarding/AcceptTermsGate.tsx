@@ -95,7 +95,7 @@ export default function AcceptTermsGate() {
               <Link href="/damage-deposit-agreement" target="_blank" className="text-riviera underline">
                 Damage Deposit Agreement
               </Link>{" "}
-              template — a peer-to-peer deposit you and your match can agree to use between yourselves for
+              template, a peer-to-peer deposit you and your match can agree to use between yourselves for
               extra peace of mind against damage. StudSwap doesn't collect, hold, or enforce it.
             </span>
           </Surface>

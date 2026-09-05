@@ -51,6 +51,18 @@ export function ArrowRightLeftIcon(props: IconProps) {
   );
 }
 
+// Lucide's "user-round": a plain silhouette, used as the avatar placeholder
+// wherever a match/liker/swap has no photo yet (see Avatar.tsx), instead of
+// a remote placehold.co image with "?" burned into it as text.
+export function UserRoundIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="8" r="5" />
+      <path d="M20 21a8 8 0 0 0-16 0" />
+    </svg>
+  );
+}
+
 export function UserShieldIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

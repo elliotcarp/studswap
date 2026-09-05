@@ -893,7 +893,10 @@ export default function TripDetails({ matchId }: { matchId: string }) {
             </div>
           )}
           {draftDays != null && draftLine && <p className="text-white/90">{draftLine}</p>}
-          <DepositEstimateCard rates={currentDayRates(detail.pricing, detail.otherUserName, paidPrice, myPrice, otherPrice)} />
+          <DepositEstimateCard
+            rates={currentDayRates(detail.pricing, detail.otherUserName, paidPrice, myPrice, otherPrice)}
+            defaultOpen
+          />
           <div className="mt-1 flex gap-2">
             <button
               type="button"
@@ -989,6 +992,8 @@ export default function TripDetails({ matchId }: { matchId: string }) {
             settlement={detail.settlement}
             confirmationCharge={detail.confirmationCharge}
             depositRates={currentDayRates(detail.pricing, detail.otherUserName)}
+            confirmedByMe={detail.confirmedByMe}
+            confirmedByOther={detail.confirmedByOther}
             onClose={() => setShowConfirmModal(false)}
           />
         )}

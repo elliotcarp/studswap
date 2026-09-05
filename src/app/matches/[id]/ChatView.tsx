@@ -6,6 +6,7 @@ import type { MessageData, ProfileCardData } from "@/types";
 import TripDetails from "./TripDetails";
 import ProfileCard from "@/components/ProfileCard";
 import MatchStatusPill from "@/components/MatchStatusPill";
+import { paymentMethodLabel } from "@/lib/paymentMethods";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -17,6 +18,9 @@ export default function ChatView({
   otherProfile,
   matchType,
   isPayer,
+  myPaymentMethod,
+  myPaymentHandle,
+  myPaymentHandleAccountName,
 }: {
   matchId: string;
   currentUserId: string;
@@ -25,6 +29,12 @@ export default function ChatView({
   otherProfile: ProfileCardData | null;
   matchType: "MUTUAL" | "PAID";
   isPayer: boolean;
+  // From the current user's own profile (set in onboarding/profile), used
+  // only to compose the optional "share my payment info" chat message below
+  // — never sent or shown anywhere else in this component.
+  myPaymentMethod: string | null;
+  myPaymentHandle: string | null;
+  myPaymentHandleAccountName: string | null;
 }) {
   const [tab, setTab] = useState<"chat" | "profile">("chat");
   const [messages, setMessages] = useState<MessageData[]>([]);
@@ -58,12 +68,12 @@ export default function ChatView({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  const sendMessage = async () => {
-    const body = draft.trim();
+  // postMessage is shared by the draft-typed send flow and sharePaymentInfo
+  // below, so a payment-info message goes through the exact same endpoint
+  // and lands in the same list, rather than being special-cased locally.
+  const postMessage = async (body: string) => {
     if (!body || sending) return;
-
     setSending(true);
-    setDraft("");
     try {
       const res = await fetch(`/api/matches/${matchId}/messages`, {
         method: "POST",
@@ -77,6 +87,26 @@ export default function ChatView({
     } finally {
       setSending(false);
     }
+  };
+
+  const sendMessage = async () => {
+    const body = draft.trim();
+    if (!body) return;
+    setDraft("");
+    await postMessage(body);
+  };
+
+  // Pulls the current user's own payment destination (set once in
+  // onboarding/profile, see PaymentMethodEditor) straight into the chat as
+  // a normal message, so they don't have to retype it by hand. Hidden
+  // entirely when it isn't set yet (see the button below) rather than
+  // nagging about it here.
+  const sharePaymentInfo = async () => {
+    if (!myPaymentMethod || !myPaymentHandle) return;
+    const body = `Here's how to pay me. ${paymentMethodLabel(myPaymentMethod)}: ${myPaymentHandle}${
+      myPaymentHandleAccountName ? ` (${myPaymentHandleAccountName})` : ""
+    }`;
+    await postMessage(body);
   };
 
   return (
@@ -147,6 +177,19 @@ export default function ChatView({
             })}
             <div ref={bottomRef} />
           </div>
+
+          {myPaymentMethod && myPaymentHandle && (
+            <div className="px-3 pt-2">
+              <button
+                type="button"
+                onClick={sharePaymentInfo}
+                disabled={sending}
+                className="text-xs font-medium text-riviera disabled:opacity-50"
+              >
+                💳 Share my payment info
+              </button>
+            </div>
+          )}
 
           <form
             className="flex gap-2 border-t p-3"

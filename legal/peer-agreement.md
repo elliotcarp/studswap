@@ -92,7 +92,7 @@ Each party occupying accommodation agrees to:
 
 **5.3 Evidence.** Both parties should take dated photographs of every room at the start and end of the stay and share them in the in-app chat. Without this, a later disagreement about damage is very hard to resolve.
 
-**5.4 No deposit, no claims process.** Nothing secures these obligations, and **StudSwap has no claims process**. If someone causes damage and won't pay, the only routes are direct negotiation, insurance, or legal action between the two parties. If you'd like some protection against this, StudSwap's app offers an optional [Damage Deposit Agreement](/damage-deposit-agreement) template you and your match can use directly between yourselves — StudSwap still isn't a party to it.
+**5.4 No deposit, no claims process.** Nothing secures these obligations, and **StudSwap has no claims process**. If someone causes damage and won't pay, the only routes are direct negotiation, insurance, or legal action between the two parties. If you'd like some protection against this, StudSwap's app offers an optional [Damage Deposit Agreement](/damage-deposit-agreement) template you and your match can use directly between yourselves; StudSwap still isn't a party to it.
 
 **5.5 Insurance.** Neither party is insured by StudSwap. Contents and personal liability policies frequently exclude — or require notification of — a non-family occupant. **Check your own policy before confirming**, and consider whether you need to tell your insurer.
 

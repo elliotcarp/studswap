@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { SwapSummary } from "@/types";
 import { ArrowRightLeftIcon } from "@/components/icons";
+import Avatar from "@/components/Avatar";
 import { SwapCardSkeleton } from "@/components/Skeleton";
 import { paymentMethodLabel } from "@/components/PaymentMethodEditor";
 import Button from "@/components/ui/Button";
@@ -99,12 +100,7 @@ export default function SwapsView() {
                 href={`/profile/${swap.otherUser.id}`}
                 className="flex gap-3 p-4 hover:bg-gray-50"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={swap.otherUser.photoUrl ?? "https://placehold.co/100x100?text=?"}
-                  alt=""
-                  className="h-14 w-14 flex-shrink-0 rounded-full object-cover"
-                />
+                <Avatar src={swap.otherUser.photoUrl} className="h-14 w-14 flex-shrink-0 rounded-full" />
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 font-medium">
                     {swap.otherUser.name}

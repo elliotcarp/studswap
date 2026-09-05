@@ -30,6 +30,7 @@ export default async function MatchChatPage({ params }: { params: { id: string }
 
   const isUserA = match.userAId === userId;
   const other = isUserA ? match.userB : match.userA;
+  const me = isUserA ? match.userA : match.userB;
   const p = other.profile;
   const matchType = match.type === "PAID" ? "PAID" : "MUTUAL";
   const isPayer = matchType === "PAID" && match.paidByUserId === userId;
@@ -49,6 +50,9 @@ export default async function MatchChatPage({ params }: { params: { id: string }
       otherProfile={p ? toProfileCardData(other.id, p, { includeAddress: true }) : null}
       matchType={matchType}
       isPayer={isPayer}
+      myPaymentMethod={me.paymentMethod}
+      myPaymentHandle={me.paymentHandle}
+      myPaymentHandleAccountName={me.paymentHandleAccountName}
     />
   );
 }

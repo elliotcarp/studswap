@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
   if (match.refundableStatusUserA !== "PENDING" || match.refundableStatusUserB !== "PENDING") {
     return NextResponse.json(
-      { error: "This match already had a refund or forfeiture processed — handle it manually" },
+      { error: "This match already had a refund or forfeiture processed, handle it manually" },
       { status: 400 }
     );
   }

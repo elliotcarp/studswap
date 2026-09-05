@@ -87,6 +87,13 @@ interface StepDef {
   subtitle?: string;
   render: (data: WizardData, setField: SetField) => React.ReactNode;
   isValid: (data: WizardData) => boolean;
+  // When present, a "Skip for now" link is shown on this step. Called before
+  // advancing so it can backfill sensible defaults for fields the backend
+  // still requires (e.g. availability dates, a day price) — only ever
+  // filling a field that's still empty, never overwriting something the
+  // student already typed. A no-op function just surfaces the button for a
+  // step that's already valid empty (photos, address).
+  onSkip?: (data: WizardData, setField: SetField) => void;
 }
 
 function textInputStep(
@@ -160,6 +167,27 @@ function chipStep(
 const MIN_AGE = 16;
 const MAX_AGE = 99;
 
+// Placeholder availability window for anyone who skips the dates step
+// entirely, rather than a today-to-today range that would fail the "to
+// after from" check downstream. Two weeks out (so it doesn't read as
+// available right now) for roughly a semester (matches the app's own
+// long-stay threshold) — a stand-in the student is expected to come back
+// and correct, not a real answer.
+// Placeholder day price for anyone who skips the pricing step entirely,
+// since Profile.pricePerDayCents is a required, non-nullable column (it
+// feeds settlement math elsewhere). A round, plausible student-flat number,
+// not a real answer, the same idea as defaultAvailabilityDates below.
+const DEFAULT_DAY_PRICE_CENTS = 3000;
+
+function defaultAvailabilityDates(): { from: string; to: string } {
+  const from = new Date();
+  from.setDate(from.getDate() + 14);
+  const to = new Date(from);
+  to.setDate(to.getDate() + 180);
+  const toInputValue = (d: Date) => d.toISOString().slice(0, 10);
+  return { from: toInputValue(from), to: toInputValue(to) };
+}
+
 const STEPS: StepDef[] = [
   textInputStep("name", "👤", "What's your name?", "Your name"),
   {
@@ -209,45 +237,51 @@ const STEPS: StepDef[] = [
       />
     ),
     isValid: () => true,
+    onSkip: () => {},
   },
   {
     icon: "📅",
-    title: "When's your flat available from?",
+    title: "When's your flat available?",
     subtitle:
-      "This is when YOUR flat is free for someone else to stay in it, not when you want to travel — you'll set your own trip dates separately when you browse other people's flats.",
+      "This is when YOUR flat is free for someone else to stay in it, not when you want to travel. You'll set your own trip dates separately when you browse other people's flats.",
     render: (data, setField) => (
-      <Input
-        type="date"
-        autoFocus
-        value={data.availableFrom}
-        onChange={(e) => setField("availableFrom", e.target.value)}
-        className="text-lg"
-      />
+      <div className="flex flex-col gap-4">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-carbon-text">From</label>
+          <Input
+            type="date"
+            autoFocus
+            value={data.availableFrom}
+            onChange={(e) => setField("availableFrom", e.target.value)}
+            className="text-lg"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-carbon-text">To</label>
+          <Input
+            type="date"
+            min={data.availableFrom || undefined}
+            value={data.availableTo}
+            onChange={(e) => setField("availableTo", e.target.value)}
+            className="text-lg"
+          />
+        </div>
+      </div>
     ),
-    isValid: (data) => data.availableFrom.length > 0,
-  },
-  {
-    icon: "📅",
-    title: "And your flat's available until when?",
-    subtitle: "Still your flat's own availability window, same as the last step.",
-    render: (data, setField) => (
-      <Input
-        type="date"
-        autoFocus
-        min={data.availableFrom || undefined}
-        value={data.availableTo}
-        onChange={(e) => setField("availableTo", e.target.value)}
-        className="text-lg"
-      />
-    ),
-    isValid: (data) => data.availableTo.length > 0 && data.availableTo > data.availableFrom,
+    isValid: (data) =>
+      data.availableFrom.length > 0 && data.availableTo.length > 0 && data.availableTo > data.availableFrom,
+    onSkip: (data, setField) => {
+      if (data.availableFrom && data.availableTo) return;
+      const { from, to } = defaultAvailabilityDates();
+      if (!data.availableFrom) setField("availableFrom", from);
+      if (!data.availableTo) setField("availableTo", to);
+    },
   },
   chipStep("accommodates", "👥", "How many people can your flat host?", ACCOMMODATES_OPTIONS),
   {
     icon: "💶",
     title: "What's a fair price?",
-    subtitle:
-      "You're a student helping another student out for a semester, not running a rental business — most people here price close to what they themselves already pay, not what the market would bear. In euros; StudSwap never collects or moves this money. Start with your monthly rent if that's easier to picture, we'll suggest a day rate from it; per day is what actually gets used for short stays, per month just for long ones.",
+    subtitle: "You're a student helping another student out for a semester, not running a rental business.",
     render: (data, setField) => (
       <div className="flex flex-col gap-4">
           <div>
@@ -299,7 +333,7 @@ const STEPS: StepDef[] = [
             />
             <p className="mt-1 text-xs text-gray-400">
               {data.pricePerMonthCents
-                ? "Estimated from your rent above (roughly rent ÷ 30) — adjust it if your situation is different."
+                ? "Estimated from your rent above (roughly rent ÷ 30), adjust it if your situation is different."
                 : "This is what's actually used for short stays. Enter your rent above and we'll suggest one."}
             </p>
           </div>
@@ -311,6 +345,9 @@ const STEPS: StepDef[] = [
       if (!data.pricePerMonthCents) return true;
       const monthPrice = Number(data.pricePerMonthCents);
       return Number.isInteger(monthPrice) && monthPrice >= 100;
+    },
+    onSkip: (data, setField) => {
+      if (!data.pricePerDayCents) setField("pricePerDayCents", String(DEFAULT_DAY_PRICE_CENTS));
     },
   },
   chipStep("smoker", "🚬", "Do you smoke?", SMOKER_OPTIONS),
@@ -330,7 +367,7 @@ const STEPS: StepDef[] = [
   {
     icon: "🖼️",
     title: "Add photos of you",
-    subtitle: `Recommended: at least ${MIN_SELF_PHOTO_COUNT}, up to ${MAX_SELF_PHOTO_COUNT}. You can skip this for now, but complete photo sets typically get far more likes and matches — we'll keep reminding you to finish this from your profile.`,
+    subtitle: `Recommended: at least ${MIN_SELF_PHOTO_COUNT}, up to ${MAX_SELF_PHOTO_COUNT}.`,
     render: (data, setField) => (
       <PhotoGridEditor
         photoUrls={data.selfPhotoUrls}
@@ -345,11 +382,12 @@ const STEPS: StepDef[] = [
     // just loses people mid-signup. See ProfileCompletionBanner for the
     // Hinge-style nudge that follows up on this after onboarding.
     isValid: () => true,
+    onSkip: () => {},
   },
   {
     icon: "🏡",
     title: "Add photos of your flat",
-    subtitle: `Recommended: at least ${MIN_FLAT_PHOTO_COUNT}, up to ${MAX_FLAT_PHOTO_COUNT}. This is skippable too — but the first flat photo becomes the very first thing people see on your card, so it's worth coming back to.`,
+    subtitle: `Recommended: at least ${MIN_FLAT_PHOTO_COUNT}, up to ${MAX_FLAT_PHOTO_COUNT}.`,
     render: (data, setField) => (
       <PhotoGridEditor
         photoUrls={data.flatPhotoUrls}
@@ -362,6 +400,7 @@ const STEPS: StepDef[] = [
       />
     ),
     isValid: () => true,
+    onSkip: () => {},
   },
   {
     icon: "🎬",
@@ -386,7 +425,7 @@ const STEPS: StepDef[] = [
     icon: "💸",
     title: "How should people pay you?",
     subtitle:
-      "Optional for now — you can skip this and add it later. Shown to a matched counterpart only after you've both confirmed and paid, so they can pay you directly; you'll just need to add it before you can confirm a swap where you're owed money. StudSwap never touches this money.",
+      "Optional for now, you can skip this and add it later. Shown to a matched counterpart only after you've both confirmed and paid, so they can pay you directly; you'll just need to add it before you can confirm a swap where you're owed money. StudSwap never touches this money.",
     render: (data, setField) => (
       <PaymentMethodEditor
         value={data}
@@ -402,6 +441,7 @@ const STEPS: StepDef[] = [
     // where this user is owed money until they've filled this in, so there's
     // no need to force it at listing creation.
     isValid: () => true,
+    onSkip: () => {},
   },
   {
     icon: "📋",
@@ -500,6 +540,16 @@ export default function OnboardingWizard({ initialProfile }: { initialProfile?: 
       setError("Could not save your profile. Please try again.");
       setSubmitting(false);
     }
+  }
+
+  // None of the skippable steps are the last one (registration, which isn't
+  // skippable, always is), so this only ever needs to advance the index,
+  // never submit.
+  function handleSkip() {
+    if (!step.onSkip) return;
+    step.onSkip(data, setField);
+    setDirection(1);
+    setStepIndex((i) => i + 1);
   }
 
   function handleBack() {
@@ -603,7 +653,14 @@ export default function OnboardingWizard({ initialProfile }: { initialProfile?: 
 
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        {step.onSkip ? (
+          <button type="button" onClick={handleSkip} className="text-sm font-medium text-gray-400">
+            Skip for now
+          </button>
+        ) : (
+          <span />
+        )}
         <button
           type="button"
           onClick={handleNext}

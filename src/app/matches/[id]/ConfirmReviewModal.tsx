@@ -15,6 +15,7 @@ import {
   ObligationsCard,
   StayDatesCard,
   DepositEstimateCard,
+  ConfirmedStatusRow,
   type ConfirmationCharge,
   type DepositRate,
   type SettlementPreview,
@@ -31,6 +32,8 @@ export default function ConfirmReviewModal({
   settlement,
   confirmationCharge,
   depositRates,
+  confirmedByMe,
+  confirmedByOther,
   onClose,
 }: {
   matchId: string;
@@ -41,6 +44,8 @@ export default function ConfirmReviewModal({
   settlement: SettlementPreview;
   confirmationCharge: ConfirmationCharge;
   depositRates: DepositRate[];
+  confirmedByMe: boolean;
+  confirmedByOther: boolean;
   onClose: () => void;
 }) {
   const [agreed, setAgreed] = useState(false);
@@ -99,6 +104,7 @@ export default function ConfirmReviewModal({
         />
         <FeeCard charge={confirmationCharge} otherUserName={otherUserName} />
         <DepositEstimateCard rates={depositRates} />
+        <ConfirmedStatusRow confirmedByMe={confirmedByMe} confirmedByOther={confirmedByOther} otherUserName={otherUserName} />
 
         <ObligationsCard otherUserName={otherUserName}>
           <label className="mt-3 flex items-start gap-2 text-xs text-gray-600">

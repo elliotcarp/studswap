@@ -1,9 +1,11 @@
-// Shared building blocks for "what does confirming actually do" — used by
+"use client";
+
+// Shared building blocks for "what does confirming actually do", used by
 // both ConfirmReviewModal (before confirming) and SwapRecapModal (a
 // read-only replay of the same information, reachable any time after via
 // TripDetails' "View swap details" button), so the two never drift apart.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { estimateSuggestedDepositCents } from "@/lib/pricing";
 
@@ -90,8 +92,8 @@ export function previewLine(
       : `${otherUserName} would owe you ${amount}${stay}.`;
   }
   return isMePaying
-    ? `You owe ${otherUserName} ${amount}${stay}. StudSwap doesn't collect or move this, and can't recover it if something goes wrong. Pay them directly using the payment details they've shared.`
-    : `${otherUserName} owes you ${amount}${stay}. StudSwap doesn't collect or move this, and can't recover it if something goes wrong. They'll pay you directly.`;
+    ? `You owe ${otherUserName} ${amount}${stay}. StudSwap doesn't collect or move this, pay them directly using the payment details they've shared.`
+    : `${otherUserName} owes you ${amount}${stay}. StudSwap doesn't collect or move this, they'll pay you directly.`;
 }
 
 export function SettlementCard({
@@ -127,7 +129,7 @@ export function FeeCard({ charge, otherUserName }: { charge: ConfirmationCharge;
       <p className="mt-1 text-sm text-gray-700">
         We charge <strong>{formatEuros(charge.totalCents)}</strong> now, but{" "}
         <strong>{formatEuros(charge.refundableCents)}</strong> comes straight back to you once your stay's
-        underway, no need to ask. This is used as insurance in case of late cancellation —{" "}
+        underway, no need to ask. This is used as insurance in case of late cancellation,{" "}
         <Link href="/fees" target="_blank" className="font-medium text-riviera underline">
           see exactly how that works
         </Link>
@@ -152,36 +154,89 @@ export function FeeCard({ charge, otherUserName }: { charge: ConfirmationCharge;
   );
 }
 
-// A rate per accommodation actually at stake — one entry for a PAID stay
+// A rate per accommodation actually at stake, one entry for a PAID stay
 // (the owner's flat, since only the payer occupies anywhere), two for a
 // MUTUAL swap (each side occupies the other's flat, so each has its own
-// suggested figure). null rates are simply omitted, e.g. before either side
-// has typed or listed a price yet.
+// suggested figure). Empty when neither side has typed or listed a price yet.
 export type DepositRate = { label: string; pricePerDayCents: number };
 
-export function DepositEstimateCard({ rates }: { rates: DepositRate[] }) {
+// Small and collapsed by default (in ConfirmReviewModal, where it's one more
+// thing on a screen about to charge a card) so it reads as a low-key
+// optional extra, not another obligation. defaultOpen lets TripDetails open
+// it by default instead, since that's the chat/propose screen where working
+// out a deposit with your match is actually the point.
+export function DepositEstimateCard({ rates, defaultOpen = false }: { rates: DepositRate[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   if (rates.length === 0) return null;
+
+  const amounts = rates.map((r) => estimateSuggestedDepositCents(r.pricePerDayCents));
+  const min = Math.min(...amounts);
+  const max = Math.max(...amounts);
+  const headline = min === max ? formatEuros(min) : `${formatEuros(min)} to ${formatEuros(max)}`;
+
   return (
-    <div className="mt-3 rounded-2xl border border-dashed border-gray-300 bg-white/95 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-        Suggested damage deposit (optional)
-      </p>
-      <p className="mt-1 text-sm text-gray-700">
-        Not collected or held by StudSwap. If you'd both like some protection against damage, here's a
-        starting point scaled to the flat's own price — agree the actual amount (or skip it entirely)
-        directly between yourselves, e.g. using the{" "}
-        <Link href="/damage-deposit-agreement" target="_blank" className="font-medium text-riviera underline">
-          Damage Deposit Agreement template
-        </Link>
-        .
-      </p>
-      <ul className="mt-2 space-y-1 text-xs text-gray-600">
-        {rates.map((r) => (
-          <li key={r.label}>
-            • {r.label}: about <strong>{formatEuros(estimateSuggestedDepositCents(r.pricePerDayCents))}</strong>
-          </li>
-        ))}
-      </ul>
+    <div className="mt-3 rounded-xl border border-dashed border-gray-300 bg-white/95 text-xs">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+      >
+        <span className="text-gray-700">
+          Suggested deposit: <strong>{headline}</strong> <span className="text-gray-400">(optional)</span>
+        </span>
+        <span className="flex-shrink-0 font-medium text-riviera">{open ? "Hide" : "See more"}</span>
+      </button>
+      {open && (
+        <div className="border-t border-gray-200 px-3 py-2">
+          <p className="text-gray-700">
+            Not collected or held by StudSwap. If you'd both like some protection against damage, agree the
+            actual amount (or skip it entirely) directly between yourselves, e.g. using the{" "}
+            <Link href="/damage-deposit-agreement" target="_blank" className="font-medium text-riviera underline">
+              Damage Deposit Agreement template
+            </Link>
+            .
+          </p>
+          <ul className="mt-2 space-y-1 text-gray-600">
+            {rates.map((r) => (
+              <li key={r.label}>
+                {r.label}: about{" "}
+                <strong>{formatEuros(estimateSuggestedDepositCents(r.pricePerDayCents))}</strong>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Who's confirmed so far, used inside ConfirmReviewModal so the thing you're
+// about to pay for shows the other side's status too, not just your own
+// pending action.
+export function ConfirmedStatusRow({
+  confirmedByMe,
+  confirmedByOther,
+  otherUserName,
+}: {
+  confirmedByMe: boolean;
+  confirmedByOther: boolean;
+  otherUserName: string;
+}) {
+  const pill = (label: string, confirmed: boolean) => (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+        confirmed ? "bg-highlighter text-highlighter-ink" : "bg-gray-100 text-gray-500"
+      }`}
+    >
+      {confirmed ? "✅ " : "⏳ "}
+      {label}
+    </span>
+  );
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {pill("You", confirmedByMe)}
+      {pill(otherUserName, confirmedByOther)}
     </div>
   );
 }

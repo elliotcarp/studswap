@@ -82,7 +82,7 @@ export default function PhotoGridEditor({
         try {
           resized = await resizeImageFile(file);
         } catch {
-          throw new Error(`Couldn't read "${file.name}" — try a JPEG, PNG, or screenshot of it instead.`);
+          throw new Error(`Couldn't read "${file.name}", try a JPEG, PNG, or screenshot of it instead.`);
         }
 
         const formData = new FormData();

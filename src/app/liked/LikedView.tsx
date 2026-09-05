@@ -6,6 +6,7 @@ import { AnimatePresence } from "framer-motion";
 import type { LikerSummary, MatchSummary } from "@/types";
 import MatchReveal from "@/components/MatchReveal";
 import MatchStatusPill from "@/components/MatchStatusPill";
+import Avatar from "@/components/Avatar";
 import { HeartIcon } from "@/components/icons";
 import { Skeleton } from "@/components/Skeleton";
 import Surface from "@/components/ui/Surface";
@@ -172,12 +173,7 @@ export default function LikedView({ myCity }: { myCity: string }) {
               <li key={liker.userId}>
                 <Surface className="flex items-center gap-3 p-3">
                   <Link href={`/profile/${liker.userId}`} className="flex min-w-0 flex-1 items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={liker.photoUrl ?? "https://placehold.co/100x100?text=?"}
-                      alt=""
-                      className="h-16 w-16 flex-shrink-0 rounded-full object-cover"
-                    />
+                    <Avatar src={liker.photoUrl} className="h-16 w-16 flex-shrink-0 rounded-full" />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{liker.name}</p>
                       <p className="text-sm text-gray-500">
@@ -213,12 +209,7 @@ export default function LikedView({ myCity }: { myCity: string }) {
                 <li key={conn.matchId}>
                   <Surface className="flex items-center gap-3 p-3">
                     <Link href={`/profile/${conn.otherUser.id}`} className="flex-shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={conn.otherUser.photoUrl ?? "https://placehold.co/100x100?text=?"}
-                        alt=""
-                        className="h-14 w-14 rounded-full object-cover"
-                      />
+                      <Avatar src={conn.otherUser.photoUrl} className="h-14 w-14 rounded-full" />
                     </Link>
                     <div className="min-w-0 flex-1">
                       <Link href={`/profile/${conn.otherUser.id}`} className="flex items-center gap-2">

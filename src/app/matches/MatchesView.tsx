@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { MatchSummary } from "@/types";
 import MatchStatusPill from "@/components/MatchStatusPill";
+import Avatar from "@/components/Avatar";
 import { HeartHandshakeIcon } from "@/components/icons";
 import { ListSkeleton } from "@/components/Skeleton";
 import Surface from "@/components/ui/Surface";
@@ -51,12 +52,7 @@ export default function MatchesView() {
           <li key={match.matchId}>
             <Surface className="flex items-center gap-3 p-3">
               <Link href={`/profile/${match.otherUser.id}`} className="flex-shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={match.otherUser.photoUrl ?? "https://placehold.co/100x100?text=?"}
-                  alt=""
-                  className="h-14 w-14 rounded-full object-cover"
-                />
+                <Avatar src={match.otherUser.photoUrl} className="h-14 w-14 rounded-full" />
               </Link>
               <div className="min-w-0 flex-1">
                 <Link href={`/profile/${match.otherUser.id}`} className="flex items-center gap-2">

@@ -51,7 +51,7 @@ function formatEuros(cents: number) {
 }
 
 function formatDate(iso: string | null) {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? new Date(iso).toLocaleString() : "Not set";
 }
 
 export default function AdminDashboard() {
@@ -134,7 +134,7 @@ export default function AdminDashboard() {
               <p className="mt-1 text-xs text-gray-500">
                 {p.recipient.paymentHandle
                   ? `${paymentMethodLabel(p.recipient.paymentMethod)}: ${p.recipient.paymentHandle}${p.recipient.paymentHandleAccountName ? ` (${p.recipient.paymentHandleAccountName})` : ""}`
-                  : "No payment details on file — contact them directly."}
+                  : "No payment details on file, contact them directly."}
                 {" · "}
                 {p.recipient.email}
                 {p.note ? ` · ${p.note}` : ""}
@@ -187,7 +187,7 @@ export default function AdminDashboard() {
                 {" · "}stay started {formatDate(r.stayFrom)} · reported {formatDate(r.reportedAt)}
               </p>
               <p className="mt-1 text-xs text-gray-500">
-                {r.resolved ? "Resolved — compensation payout created." : "Not yet resolved."} Match {r.matchId}
+                {r.resolved ? "Resolved: compensation payout created." : "Not yet resolved."} Match {r.matchId}
               </p>
             </div>
           ))}
@@ -197,7 +197,7 @@ export default function AdminDashboard() {
       <section className="mt-10">
         <h2 className="text-lg font-semibold text-gray-800">Settlement disputes ({disputes.length})</h2>
         <p className="mt-1 text-xs text-gray-500">
-          "They never paid me" style reports. StudSwap doesn't handle this money and can't resolve these — this is
+          "They never paid me" style reports. StudSwap doesn't handle this money and can't resolve these, this is
           purely a record.
         </p>
         <div className="mt-3 flex flex-col gap-2">
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
       </section>
 
       <section className="mt-10 rounded-xl border border-red-200 bg-red-50 p-4">
-        <h2 className="text-lg font-semibold text-red-900">Void a match — our fault</h2>
+        <h2 className="text-lg font-semibold text-red-900">Void a match (our fault)</h2>
         <p className="mt-1 text-xs text-red-800">
           Full €25 refund to both sides, including the service fee. Only works on a validated match that hasn't
           already had a refund or forfeiture processed.

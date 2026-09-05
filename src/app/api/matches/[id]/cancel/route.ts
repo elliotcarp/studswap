@@ -100,7 +100,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
   if (match.completedProcessedAt != null || stayTo < now) {
     return NextResponse.json(
-      { error: "This stay has already happened — see ratings instead" },
+      { error: "This stay has already happened, see ratings instead" },
       { status: 400 }
     );
   }

@@ -213,6 +213,13 @@ export default function ProfileView({
   const [savingPaymentHandle, setSavingPaymentHandle] = useState(false);
   const [paymentHandleError, setPaymentHandleError] = useState<string | null>(null);
 
+  // Drives the same "needs more photos" highlight as ProfileCompletionBanner
+  // above, but on the section itself, right where the fix actually happens.
+  // Deliberately scoped to photos only, not payment info (that's optional
+  // until you actually try to confirm a match, no need to nag for it here).
+  const needsSelfPhotos = profile.selfPhotoUrls.length < MIN_SELF_PHOTO_COUNT;
+  const needsFlatPhotos = profile.flatPhotoUrls.length < MIN_FLAT_PHOTO_COUNT;
+
   async function savePaymentHandle() {
     setSavingPaymentHandle(true);
     setPaymentHandleError(null);
@@ -379,7 +386,7 @@ export default function ProfileView({
           <div className="flex flex-col gap-2">
             <p className="text-xs text-carbon-text">
               If the city your flat is in runs a short-term rental registration scheme, add the registration
-              number here. Required under EU rules if it applies to you — tick exempt if it doesn't.
+              number here. Required under EU rules if it applies to you, tick exempt if it doesn't.
             </p>
             <Input
               autoFocus
@@ -414,9 +421,16 @@ export default function ProfileView({
       </Surface>
 
       {/* Photos of you */}
-      <Surface className="p-5">
+      <Surface className={`p-5 ${needsSelfPhotos ? "ring-2 ring-bloom/60" : ""}`}>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-semibold text-chalk">Photos of you</span>
+          <span className="flex items-center gap-2 text-sm font-semibold text-chalk">
+            Photos of you
+            {needsSelfPhotos && (
+              <span className="rounded-full bg-bloom/15 px-2 py-0.5 text-xs font-medium text-bloom-text">
+                Add more
+              </span>
+            )}
+          </span>
           {editingKey !== "selfPhotos" && (
             <button
               type="button"
@@ -450,9 +464,16 @@ export default function ProfileView({
       </Surface>
 
       {/* Photos of the flat */}
-      <Surface className="p-5">
+      <Surface className={`p-5 ${needsFlatPhotos ? "ring-2 ring-bloom/60" : ""}`}>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-semibold text-chalk">Photos of the flat</span>
+          <span className="flex items-center gap-2 text-sm font-semibold text-chalk">
+            Photos of the flat
+            {needsFlatPhotos && (
+              <span className="rounded-full bg-bloom/15 px-2 py-0.5 text-xs font-medium text-bloom-text">
+                Add more
+              </span>
+            )}
+          </span>
           {editingKey !== "flatPhotos" && (
             <button
               type="button"
@@ -464,7 +485,7 @@ export default function ProfileView({
           )}
         </div>
         <p className="mb-2 text-xs text-carbon-text">
-          The first photo here is the very first thing people see on your card — mark one as the cover
+          The first photo here is the very first thing people see on your card. Mark one as the cover
           photo below to control which.
         </p>
         {editingKey === "flatPhotos" && draft ? (
@@ -583,7 +604,6 @@ export default function ProfileView({
           <Link
             key={link.href}
             href={link.href}
-            target="_blank"
             className="flex items-center justify-between border-t border-carbon-line px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
           >
             {link.label}
@@ -602,6 +622,7 @@ const LEGAL_LINKS = [
   { href: "/terms", label: "Terms of Service" },
   { href: "/fees", label: "Fees and Refunds Policy" },
   { href: "/peer-agreement", label: "Peer Swap Agreement" },
+  { href: "/damage-deposit-agreement", label: "Damage Deposit Agreement" },
   { href: "/privacy", label: "Privacy Policy" },
 ];
 

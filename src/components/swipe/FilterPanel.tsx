@@ -13,6 +13,7 @@ import { animate, motion, useMotionValue } from "framer-motion";
 import CityPicker from "@/components/CityPicker";
 import ChipSelect from "@/components/onboarding/ChipSelect";
 import { ACCOMMODATES_OPTIONS } from "@/lib/onboardingOptions";
+import InfoTooltip from "@/components/ui/InfoTooltip";
 import type { CandidateFilters } from "@/types";
 import { SPRING_DEFAULT, SPRING_MOMENTUM, project, rubberband, usePrefersReducedMotion } from "@/lib/motion";
 import Button from "@/components/ui/Button";
@@ -177,10 +178,9 @@ export default function FilterPanel({
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Your trip dates</p>
-            <p className="text-xs text-white/70">
-              When YOU want to go away — we'll show flats that are free during this window, not your own
-              flat's availability.
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/70">
+              Your trip dates
+              <InfoTooltip text="When YOU want to go away. We'll show flats that are free during this window, not your own flat's availability." />
             </p>
             <div className="mt-1.5 flex gap-2">
               <div className="flex-1">
@@ -212,13 +212,12 @@ export default function FilterPanel({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="filter-overlap" className="text-xs font-semibold uppercase tracking-wide text-white/70">
-              Minimum overlap (days)
-            </label>
-            <p className="text-xs text-white/70">
-              A swap only works if your dates and theirs overlap. This is how flexible you are
-              rather than requiring an exact match.
-            </p>
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="filter-overlap" className="text-xs font-semibold uppercase tracking-wide text-white/70">
+                Minimum overlap (days)
+              </label>
+              <InfoTooltip text="A swap only works if your dates and theirs overlap. This is how flexible you are, rather than requiring an exact match." />
+            </div>
             <input
               id="filter-overlap"
               type="number"
