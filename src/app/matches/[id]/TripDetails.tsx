@@ -502,8 +502,12 @@ export default function TripDetails({ matchId }: { matchId: string }) {
     </p>
   );
 
+  // No margin of its own (unlike the standalone block this used to be) —
+  // every call site now places this directly inside a `flex gap-2` row
+  // alongside the other action buttons for that state, and lets the row's
+  // own gap handle spacing.
   const cancelSection = detail.cancellationPreview && (
-    <div className="mt-3">
+    <div>
       {cancelling ? (
         <div className="rounded-2xl bg-white/95 p-3 shadow-inner">
           {detail.cancellationPreview.outcome === "REFUNDED" ? (
@@ -920,7 +924,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           <DepositEstimateCard
             rates={currentDayRates(detail.pricing, detail.otherUserName, paidPrice, myPrice, otherPrice)}
           />
-          <div className="mt-1 flex gap-2">
+          <div className="mt-1 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={propose}
@@ -938,8 +942,8 @@ export default function TripDetails({ matchId }: { matchId: string }) {
                 Cancel
               </button>
             )}
+            {switchToMutualButton}
           </div>
-          {switchToMutualButton}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -974,7 +978,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           {detail.confirmedByMe && (
             <p className="text-xs text-white/80">Waiting for {detail.otherUserName} to confirm.</p>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {!detail.confirmedByMe && (
               <button
                 type="button"
@@ -994,9 +998,9 @@ export default function TripDetails({ matchId }: { matchId: string }) {
                 Propose different terms
               </button>
             )}
+            {switchToMutualButton}
+            {cancelSection}
           </div>
-          {switchToMutualButton}
-          {cancelSection}
         </div>
       )}
       </div>

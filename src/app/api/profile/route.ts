@@ -12,6 +12,7 @@ import {
 import { EUROPEAN_CITIES } from "@/lib/cities";
 import { MAX_PROMPT_COUNT, MIN_PROMPT_COUNT, PROMPTS } from "@/lib/prompts";
 import { toProfileCardData } from "@/lib/profileMapping";
+import { stayDurationDays } from "@/lib/pricing";
 import type { ProfileCardData } from "@/types";
 
 const promptSchema = z.object({
@@ -183,6 +184,11 @@ export async function POST(request: Request) {
 //   tripFrom/tripTo   : the viewer's desired travel window
 //   minOverlapDays    : how many days the candidate's availability must
 //                       overlap with tripFrom/tripTo to count as a match
+//   minStayDays       : how many days the viewer wants to stay, full stop —
+//                       filters out candidates whose own availability
+//                       window is shorter than this, independent of
+//                       tripFrom/tripTo (useful before you've picked exact
+//                       dates, just know roughly how long you want to go for)
 //   minAccommodates   : candidate's flat must fit at least this many people
 // Results are ranked best-match-first: longest date overlap with
 // tripFrom/tripTo wins, newest profile breaks ties.
@@ -198,6 +204,7 @@ export async function GET(request: Request) {
   const tripFromParam = searchParams.get("tripFrom");
   const tripToParam = searchParams.get("tripTo");
   const minOverlapDays = Number(searchParams.get("minOverlapDays")) || 0;
+  const minStayDays = Number(searchParams.get("minStayDays")) || 0;
   const minAccommodates = Number(searchParams.get("minAccommodates")) || 0;
 
   const tripFrom = tripFromParam ? new Date(tripFromParam) : null;
@@ -245,6 +252,8 @@ export async function GET(request: Request) {
     // by itself hide a candidate, since swap dates are negotiated in chat
     // after matching, not locked in before it (see /api/matches/[id]/propose).
     if (hasValidTripRange && minOverlapDays > 0 && overlapDays < minOverlapDays) return false;
+
+    if (minStayDays > 0 && stayDurationDays(p.availableFrom, p.availableTo) < minStayDays) return false;
 
     return true;
   });

@@ -20,6 +20,7 @@ function buildQuery(filters: CandidateFilters): string {
   if (filters.tripFrom) params.set("tripFrom", filters.tripFrom);
   if (filters.tripTo) params.set("tripTo", filters.tripTo);
   if (filters.minOverlapDays) params.set("minOverlapDays", filters.minOverlapDays);
+  if (filters.minStayDays) params.set("minStayDays", filters.minStayDays);
   if (filters.minAccommodates) params.set("minAccommodates", filters.minAccommodates);
   return params.toString();
 }
@@ -28,6 +29,7 @@ function countActive(filters: CandidateFilters): number {
   let n = 0;
   if (filters.city.trim()) n++;
   if (Number(filters.minOverlapDays) > 0) n++;
+  if (Number(filters.minStayDays) > 0) n++;
   if (Number(filters.minAccommodates) > 1) n++;
   return n;
 }
@@ -50,6 +52,7 @@ export default function SwipeView({
     tripFrom: defaultTripFrom,
     tripTo: defaultTripTo,
     minOverlapDays: "0",
+    minStayDays: "0",
     minAccommodates: "1",
   });
   const [showFilters, setShowFilters] = useState(false);

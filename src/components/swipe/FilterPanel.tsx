@@ -230,6 +230,24 @@ export default function FilterPanel({
           </div>
 
           <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="filter-min-stay" className="text-xs font-semibold uppercase tracking-wide text-white/70">
+                Minimum stay (days)
+              </label>
+              <InfoTooltip text="How many days you want to stay at the other person's place. We'll only show flats free for at least that long." />
+            </div>
+            <input
+              id="filter-min-stay"
+              type="number"
+              min={0}
+              inputMode="numeric"
+              value={draft.minStayDays}
+              onChange={(e) => setDraft((prev) => ({ ...prev, minStayDays: e.target.value }))}
+              className="w-full rounded-xl border-0 bg-white/95 px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-white sm:w-32"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-white/70">Minimum group size</span>
             <ChipSelect
               options={ACCOMMODATES_OPTIONS}
@@ -247,7 +265,14 @@ export default function FilterPanel({
           <Button
             variant="onGradientGhost"
             onClick={() =>
-              setDraft({ city: "", tripFrom: "", tripTo: "", minOverlapDays: "0", minAccommodates: "1" })
+              setDraft({
+                city: "",
+                tripFrom: "",
+                tripTo: "",
+                minOverlapDays: "0",
+                minStayDays: "0",
+                minAccommodates: "1",
+              })
             }
           >
             Reset

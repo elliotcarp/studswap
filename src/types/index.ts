@@ -69,6 +69,10 @@ export interface CandidateFilters {
   tripFrom: string; // yyyy-mm-dd
   tripTo: string; // yyyy-mm-dd
   minOverlapDays: string;
+  // How many days the viewer wants to stay at the other person's place —
+  // filters out candidates whose own availability window is shorter than
+  // this, independent of whether tripFrom/tripTo are set yet.
+  minStayDays: string;
   minAccommodates: string; // "1" | "2" | "3" | "4" | "5+"
 }
 
