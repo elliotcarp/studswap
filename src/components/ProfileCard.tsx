@@ -44,7 +44,15 @@ function Photo({ url, badge }: { url: string; badge?: React.ReactNode }) {
 // depends on a third-party host and always matches the app's own look.
 function NoPhotoPlaceholder({ badge }: { badge?: React.ReactNode }) {
   return (
-    <div className="relative mx-3 my-3 flex h-40 w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl bg-gradient-to-br from-riviera/20 to-bloom/20 text-riviera shadow-md">
+    // No w-full here: this div already has mx-3 (margin), and `width: 100%`
+    // plus margin on the SAME element overflows the parent by the margin
+    // amount (percentage widths don't subtract margins the way `auto` does)
+    // — that overflow was getting clipped by the outer card's rounded
+    // border, cutting the box's right edge off flush against it instead of
+    // leaving the same gap the left edge has. Photo's wrapper div avoids
+    // this by putting w-full on the inner <img> instead, whose parent (this
+    // same kind of margined div) is what should stay auto-width.
+    <div className="relative mx-3 my-3 flex h-40 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl bg-gradient-to-br from-riviera/20 to-bloom/20 text-riviera shadow-md">
       <ImageIcon className="h-8 w-8" strokeWidth={1.5} />
       <span className="text-sm font-medium">No photos yet</span>
       {badge}
