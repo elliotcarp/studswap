@@ -224,7 +224,7 @@ export default function LikedView({ myCity }: { myCity: string }) {
                       <Link
                         href={`/profile/${conn.otherUser.id}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-2"
+                        className="inline-flex max-w-full min-w-0 items-center gap-2"
                       >
                         <p className="min-w-0 truncate font-medium">{conn.otherUser.name}</p>
                         <MatchStatusPill matchType={conn.matchType} isPayer={conn.isPayer} />

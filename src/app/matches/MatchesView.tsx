@@ -68,7 +68,7 @@ export default function MatchesView() {
                 <Link
                   href={`/profile/${match.otherUser.id}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2"
+                  className="inline-flex max-w-full min-w-0 items-center gap-2"
                 >
                   <p className="min-w-0 truncate font-medium">{match.otherUser.name}</p>
                   <MatchStatusPill matchType={match.matchType} isPayer={match.isPayer} />
