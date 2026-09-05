@@ -219,6 +219,20 @@ export default function TripDetails({ matchId }: { matchId: string }) {
   const [disputeBusy, setDisputeBusy] = useState(false);
   const [disputeNote, setDisputeNote] = useState("");
   const [showDisputeForm, setShowDisputeForm] = useState(false);
+  // Lets this whole panel shrink to a one-line header so more of the chat
+  // below is visible, since it's grown to hold dates, price, settlement,
+  // the deposit estimate, and confirm actions all at once.
+  const [collapsed, setCollapsed] = useState(false);
+  const collapseToggle = (
+    <button
+      type="button"
+      onClick={() => setCollapsed((c) => !c)}
+      aria-label={collapsed ? "Expand" : "Collapse"}
+      className="flex-shrink-0 rounded-full p-1 text-current opacity-70 transition-transform active:scale-90 hover:opacity-100"
+    >
+      {collapsed ? "▼" : "▲"}
+    </button>
+  );
   const checkoutNotice = searchParams.get("confirm"); // "success" | "cancelled" | null, back from Stripe
 
   async function reportNoShow() {
@@ -390,7 +404,7 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg">
             🚫
           </span>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Cancelled</p>
             <p className="font-display text-lg font-bold text-gray-800">
               {c?.outcome === "OUR_FAULT"
@@ -400,9 +414,10 @@ export default function TripDetails({ matchId }: { matchId: string }) {
                   : "This swap was cancelled"}
             </p>
           </div>
+          {collapseToggle}
         </div>
 
-        {c && (
+        {!collapsed && c && (
           <div className="mt-3 space-y-2">
             <p className="text-xs text-gray-500">
               Cancelled {formatDate(c.cancelledAt)}
@@ -657,13 +672,16 @@ export default function TripDetails({ matchId }: { matchId: string }) {
             <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/15 text-lg">
               ✅
             </span>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Validated</p>
               <p className="font-display text-lg font-bold">
                 {detail.stayFrom && formatDate(detail.stayFrom)} to {detail.stayTo && formatDate(detail.stayTo)}
               </p>
             </div>
+            {collapseToggle}
           </div>
+          {!collapsed && (
+          <>
           <div className="mt-3">{line && <p className="text-white/90">{line}</p>}</div>
           {detail.otherPaymentHandle && (
             <p className="mt-1 rounded-xl bg-white/10 px-3 py-2 text-xs text-white/90">
@@ -786,6 +804,8 @@ export default function TripDetails({ matchId }: { matchId: string }) {
             {recapButton}
             {!detail.completedProcessedAt && cancelSection}
           </div>
+          </>
+          )}
         </div>
         {detail.completedProcessedAt && (
           <RatingPrompt matchId={detail.matchId} otherUserName={detail.otherUserName} />
@@ -814,6 +834,14 @@ export default function TripDetails({ matchId }: { matchId: string }) {
   return (
     <div className="border-b bg-gradient-to-br from-riviera-strong via-bloom to-spritz p-5 text-sm text-white">
       {checkoutNoticeBanner}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-white/70">
+          {editing ? "Propose terms" : "Trip details"}
+        </p>
+        {collapseToggle}
+      </div>
+      {!collapsed && (
+      <div className="mt-2">
       {editing ? (
         <div className="flex flex-col gap-3">
           <div>
@@ -943,11 +971,9 @@ export default function TripDetails({ matchId }: { matchId: string }) {
             {confirmedPill("You", detail.confirmedByMe)}
             {confirmedPill(detail.otherUserName, detail.confirmedByOther)}
           </div>
-          <p className="text-xs text-white/80">
-            {!detail.confirmedByMe
-              ? "Happy with these terms? Review and confirm."
-              : `Waiting for ${detail.otherUserName} to confirm.`}
-          </p>
+          {detail.confirmedByMe && (
+            <p className="text-xs text-white/80">Waiting for {detail.otherUserName} to confirm.</p>
+          )}
           <div className="flex gap-2">
             {!detail.confirmedByMe && (
               <button
@@ -972,6 +998,8 @@ export default function TripDetails({ matchId }: { matchId: string }) {
           {switchToMutualButton}
           {cancelSection}
         </div>
+      )}
+      </div>
       )}
       {error && (
         <p className="mt-3 rounded-lg bg-white/95 px-3 py-2 text-xs font-medium text-red-700">{error}</p>

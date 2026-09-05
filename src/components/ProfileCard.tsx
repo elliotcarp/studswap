@@ -44,8 +44,8 @@ function Photo({ url, badge }: { url: string; badge?: React.ReactNode }) {
 // depends on a third-party host and always matches the app's own look.
 function NoPhotoPlaceholder({ badge }: { badge?: React.ReactNode }) {
   return (
-    <div className="relative mx-3 my-3 flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-br from-riviera/20 to-bloom/20 text-riviera shadow-md">
-      <ImageIcon className="h-12 w-12" strokeWidth={1.5} />
+    <div className="relative mx-3 my-3 flex h-40 w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl bg-gradient-to-br from-riviera/20 to-bloom/20 text-riviera shadow-md">
+      <ImageIcon className="h-8 w-8" strokeWidth={1.5} />
       <span className="text-sm font-medium">No photos yet</span>
       {badge}
     </div>
