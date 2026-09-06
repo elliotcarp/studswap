@@ -106,7 +106,11 @@ function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): 
       key: "roomType",
       section: "accommodation",
       icon: "🏠",
-      message: <strong>Add your room type.</strong>,
+      message: (
+        <>
+          <strong>Add your room type.</strong> It helps people judge fit at a glance.
+        </>
+      ),
     });
   }
   if (profile.amenities.length === 0) {
@@ -114,7 +118,11 @@ function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): 
       key: "amenities",
       section: "accommodation",
       icon: "🧰",
-      message: <strong>Add a few amenities.</strong>,
+      message: (
+        <>
+          <strong>Add a few amenities.</strong> It's often the deciding factor between two similar places.
+        </>
+      ),
     });
   }
   if (!profile.neighbourhood) {
@@ -122,7 +130,12 @@ function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): 
       key: "neighbourhood",
       section: "accommodation",
       icon: "📍",
-      message: <strong>Add your neighbourhood or area.</strong>,
+      message: (
+        <>
+          <strong>Add your neighbourhood or area.</strong> It helps people judge whether the location works for
+          them.
+        </>
+      ),
     });
   }
   if (!profile.smoker) {
@@ -130,7 +143,11 @@ function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): 
       key: "smoker",
       section: "preferences",
       icon: "🚬",
-      message: <strong>Let people know if you smoke.</strong>,
+      message: (
+        <>
+          <strong>Let people know if you smoke.</strong> It helps you get paired with someone compatible.
+        </>
+      ),
     });
   }
   if (!profile.pets) {
@@ -138,7 +155,11 @@ function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): 
       key: "pets",
       section: "preferences",
       icon: "🐾",
-      message: <strong>Let people know about pets.</strong>,
+      message: (
+        <>
+          <strong>Let people know about pets.</strong> It helps you get paired with someone compatible.
+        </>
+      ),
     });
   }
   if (!profile.selfDescription) {
@@ -146,7 +167,11 @@ function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): 
       key: "selfDescription",
       section: "personal",
       icon: "📝",
-      message: <strong>Write a bit about yourself.</strong>,
+      message: (
+        <>
+          <strong>Write a bit about yourself.</strong> It's what makes someone trust you enough to reach out.
+        </>
+      ),
     });
   }
   if (!profile.flatDescription) {
@@ -154,7 +179,11 @@ function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): 
       key: "flatDescription",
       section: "accommodation",
       icon: "🏡",
-      message: <strong>Write a bit about your flat.</strong>,
+      message: (
+        <>
+          <strong>Write a bit about your flat.</strong> It gives people a much better sense of the place.
+        </>
+      ),
     });
   }
   if (!profile.address) {
@@ -162,7 +191,12 @@ function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): 
       key: "address",
       section: "accommodation",
       icon: "📍",
-      message: <strong>Add your exact address.</strong>,
+      message: (
+        <>
+          <strong>Add your exact address.</strong> It's only shown to your match once you've confirmed, never
+          public.
+        </>
+      ),
     });
   }
 

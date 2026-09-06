@@ -51,6 +51,17 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
+// The eye-catching treatment for the handful of badges that most directly
+// decide a swipe (year of study, room type, arrangement preference) —
+// everything else stays the plain gray Badge above.
+function GradientPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-gradient-to-r from-riviera/15 to-bloom/15 px-3 py-1 text-xs font-semibold text-riviera-strong">
+      {children}
+    </span>
+  );
+}
+
 function Photo({ url, badge }: { url: string; badge?: React.ReactNode }) {
   return (
     <div className="relative mx-3 my-3 overflow-hidden rounded-2xl shadow-md">
@@ -273,15 +284,9 @@ export default function ProfileCard({
             {profile.program} · {profile.university}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-gradient-to-r from-riviera/15 to-bloom/15 px-3 py-1 text-xs font-semibold text-riviera-strong">
-              {profile.yearOfStudy}
-            </span>
-            {profile.roomType && <Badge>{profile.roomType}</Badge>}
-            {profile.arrangementPreference && (
-              <span className="rounded-full bg-gradient-to-r from-riviera/15 to-bloom/15 px-3 py-1 text-xs font-semibold text-riviera-strong">
-                🔁 {profile.arrangementPreference}
-              </span>
-            )}
+            <GradientPill>{profile.yearOfStudy}</GradientPill>
+            {profile.roomType && <GradientPill>{profile.roomType}</GradientPill>}
+            {profile.arrangementPreference && <GradientPill>🔁 {profile.arrangementPreference}</GradientPill>}
           </div>
           {profile.amenities.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
