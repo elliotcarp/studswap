@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { authOptions } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 
 // Client-upload token endpoint for flat walkthrough videos: the browser
 // uploads the file bytes straight to Blob storage (see VideoUploader.tsx),
@@ -16,6 +17,10 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  const uploaderKey = (session.user as { id?: string }).id ?? session.user.email ?? "unknown";
+  if (!rateLimit(`upload-video:${uploaderKey}`, 10, 10 * 60 * 1000).allowed) {
+    return NextResponse.json({ error: "Slow down a bit and try again shortly." }, { status: 429 });
   }
 
   const body = (await request.json()) as HandleUploadBody;

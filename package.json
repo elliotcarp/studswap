@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "predev": "node scripts/set-prisma-provider.js && prisma generate",
+    "build": "node scripts/set-prisma-provider.js && prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
+    "prisma:generate": "node scripts/set-prisma-provider.js && prisma generate",
+    "prisma:migrate": "node scripts/set-prisma-provider.js && prisma migrate dev",
+    "prisma:studio": "node scripts/set-prisma-provider.js && prisma studio",
     "seed": "node prisma/seed.js",
     "test": "vitest run"
   },

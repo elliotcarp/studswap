@@ -2260,6 +2260,13 @@ export function isAllowedUniversityEmail(email: string): boolean {
   );
 }
 
+// Caches AI fallback results per domain (see below) so repeat sign-ins from
+// the same unlisted-but-legitimate university domain don't re-spend an
+// Anthropic call every time — this runs on every sign-in attempt, not just
+// signup (see authOptions.callbacks.signIn in auth.ts).
+const aiDomainCache = new Map<string, { result: boolean; expiresAt: number }>();
+const AI_DOMAIN_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 // Same check, but for domains missing from the static list, asks Claude whether
 // the domain looks like a university/school domain before rejecting.
 export async function isAllowedUniversityEmailWithAIFallback(email: string): Promise<boolean> {
@@ -2268,6 +2275,27 @@ export async function isAllowedUniversityEmailWithAIFallback(email: string): Pro
   const domain = email.toLowerCase().split("@")[1];
   if (!domain) return false;
 
+  const cached = aiDomainCache.get(domain);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+  // The AI fallback costs real money per call and gates account creation —
+  // an open cost/abuse vector as soon as signup is public. Cap how often a
+  // *new* domain can trigger it (per-domain, plus a global ceiling across
+  // all domains); a domain already resolved is served from the cache above
+  // instead of counting against this, so a signup wave from the same
+  // (unlisted) university only ever spends one AI call total. The global
+  // cap only bites on many *distinct* new domains within the hour — set
+  // high enough that a real multi-university launch spike won't trip it;
+  // its job is a last-resort circuit breaker against a large distributed
+  // abuse campaign, not shaping normal traffic. Fails closed like the rest
+  // of this check: a rate-limited domain is treated as not allowed rather
+  // than risking an unbounded bill.
+  const { rateLimit } = await import("./rateLimit");
+  if (!rateLimit(`ai-domain-check:${domain}`, 3, 60 * 60 * 1000).allowed) return false;
+  if (!rateLimit("ai-domain-check:global", 1000, 60 * 60 * 1000).allowed) return false;
+
   const { isLikelyUniversityDomain } = await import("./aiDomainCheck");
-  return isLikelyUniversityDomain(domain);
+  const result = await isLikelyUniversityDomain(domain);
+  aiDomainCache.set(domain, { result, expiresAt: Date.now() + AI_DOMAIN_CACHE_TTL_MS });
+  return result;
 }

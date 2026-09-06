@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 
 // Photo storage via Vercel Blob (public access, since profile/flat photos
 // are shown to matched/prospective counterparts). Writing to the local
@@ -16,6 +17,10 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  const uploaderKey = (session.user as { id?: string }).id ?? session.user.email ?? "unknown";
+  if (!rateLimit(`upload:${uploaderKey}`, 30, 10 * 60 * 1000).allowed) {
+    return NextResponse.json({ error: "Slow down a bit and try again shortly." }, { status: 429 });
   }
 
   const formData = await request.formData().catch(() => null);

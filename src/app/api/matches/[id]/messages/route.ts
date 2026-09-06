@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 
 const messageSchema = z.object({
   body: z.string().trim().min(1).max(2000),
@@ -50,6 +51,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  if (!rateLimit(`message:${userId}`, 60, 5 * 60 * 1000).allowed) {
+    return NextResponse.json({ error: "Slow down a bit and try again shortly." }, { status: 429 });
   }
 
   const match = await requireParticipant(params.id, userId);

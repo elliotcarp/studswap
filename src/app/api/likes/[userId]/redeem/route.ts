@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 
 // POST: let someone who already liked you (swiped right on you) pay to stay
 // at YOUR flat, without you needing to like them back. Used on the "Liked"
@@ -18,6 +19,9 @@ export async function POST(request: Request, { params }: { params: { userId: str
   const myId = (session?.user as { id?: string } | undefined)?.id;
   if (!myId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  if (!rateLimit(`redeem:${myId}`, 60, 10 * 60 * 1000).allowed) {
+    return NextResponse.json({ error: "Slow down a bit and try again shortly." }, { status: 429 });
   }
 
   const theirId = params.userId;

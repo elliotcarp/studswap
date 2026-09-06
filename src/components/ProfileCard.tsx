@@ -8,12 +8,23 @@
 import type { ProfileCardData, RatingSummary } from "@/types";
 import Surface from "@/components/ui/Surface";
 import { ImageIcon } from "@/components/icons";
+import { LONG_STAY_THRESHOLD_DAYS } from "@/lib/pricing";
 
+// Bare "Sep 1 to Aug 5" reads as an invalid end-before-start range without a
+// year to show it actually spans two years — show the year whenever the
+// range crosses a calendar year boundary, or whenever the stay is long
+// enough (see LONG_STAY_THRESHOLD_DAYS) that a reader might otherwise assume
+// it's within the current year by default.
 function formatDateRange(fromIso: string, toIso: string) {
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  const from = new Date(fromIso).toLocaleDateString("en-US", opts);
-  const to = new Date(toIso).toLocaleDateString("en-US", opts);
-  return `${from} to ${to}`;
+  const from = new Date(fromIso);
+  const to = new Date(toIso);
+  const stayDays = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24);
+  const showYear = from.getFullYear() !== to.getFullYear() || stayDays >= LONG_STAY_THRESHOLD_DAYS;
+
+  const opts: Intl.DateTimeFormatOptions = showYear
+    ? { month: "short", day: "numeric", year: "numeric" }
+    : { month: "short", day: "numeric" };
+  return `${from.toLocaleDateString("en-US", opts)} to ${to.toLocaleDateString("en-US", opts)}`;
 }
 
 function Badge({ children }: { children: React.ReactNode }) {
@@ -200,6 +211,9 @@ export default function ProfileCard({
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="font-display truncate text-xl font-bold text-riviera-strong">
                 {profile.homeCity}
+                {profile.neighbourhood && (
+                  <span className="ml-1 font-sans text-sm font-medium text-riviera">· {profile.neighbourhood}</span>
+                )}
               </h2>
               <span className="flex-shrink-0 text-sm text-gray-500">
                 {profile.name}, {profile.age}
@@ -217,10 +231,24 @@ export default function ProfileCard({
                     €{(Number(profile.pricePerMonthCents) / 100).toFixed(0)}/month
                   </span>
                 )}
+                {priceCaption(profile.arrangementPreference) && (
+                  <span className="block text-[11px] text-gray-400">{priceCaption(profile.arrangementPreference)}</span>
+                )}
               </span>
             </div>
           </div>
         </Surface>
+
+        {/* The central "is this worth swiping right on" question: date fit
+            and swap-vs-paid compatibility, computed against the viewer's own
+            profile (see /api/profile GET) — undefined outside discovery
+            (match chat, profile preview), where there's no "viewer" to be
+            relative to. */}
+        {(profile.overlapWithViewerDays !== undefined || profile.mutualSwapPossible !== undefined) && (
+          <div className="mx-3 mt-2 rounded-xl bg-gradient-to-r from-bloom/15 to-riviera/15 px-3 py-2 text-center text-xs font-semibold text-riviera-strong">
+            {compatibilityLine(profile.overlapWithViewerDays, profile.mutualSwapPossible)}
+          </div>
+        )}
 
         {ratingDisplay === "full" && <RatingStatsBlock ratingSummary={profile.ratingSummary} />}
 
@@ -232,7 +260,16 @@ export default function ProfileCard({
             <span className="rounded-full bg-gradient-to-r from-riviera/15 to-bloom/15 px-3 py-1 text-xs font-semibold text-riviera-strong">
               {profile.yearOfStudy}
             </span>
+            {profile.roomType && <Badge>{profile.roomType}</Badge>}
+            {profile.arrangementPreference && <Badge>🔁 {profile.arrangementPreference}</Badge>}
           </div>
+          {profile.amenities.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {profile.amenities.map((a) => (
+                <Badge key={a}>{a}</Badge>
+              ))}
+            </div>
+          )}
           {profile.selfDescription && (
             <p className="mt-3 whitespace-pre-wrap text-base text-gray-700">{profile.selfDescription}</p>
           )}
@@ -267,13 +304,33 @@ export default function ProfileCard({
           <Photo key={url} url={url} />
         ))}
 
-        <div className="p-4 pb-24 pt-2">
-          <div className="flex flex-wrap gap-2">
-            <Badge>🚬 {profile.smoker}</Badge>
-            <Badge>🐾 {profile.pets}</Badge>
+        {(profile.smoker || profile.pets) && (
+          <div className="p-4 pb-24 pt-2">
+            <div className="flex flex-wrap gap-2">
+              {profile.smoker && <Badge>🚬 {profile.smoker}</Badge>}
+              {profile.pets && <Badge>🐾 {profile.pets}</Badge>}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
+}
+
+// Deferred to the post-onboarding checklist (see OnboardingWizard.tsx), so
+// unset ("Either"'s default aside) is a real, common state — no caption
+// rather than a misleading one.
+function priceCaption(arrangementPreference: string): string | null {
+  if (arrangementPreference === "Mutual swap only") return "swap fairness calc";
+  if (arrangementPreference === "Paid stay only") return "to book directly";
+  return null;
+}
+
+// See ProfileCardData.overlapWithViewerDays/mutualSwapPossible — both are
+// computed server-side, relative to the viewer's own profile.
+function compatibilityLine(overlapDays: number | null | undefined, mutualSwapPossible: boolean | undefined): string {
+  const parts: string[] = [];
+  if (overlapDays != null) parts.push(`${overlapDays}-day overlap with your dates`);
+  if (mutualSwapPossible !== undefined) parts.push(mutualSwapPossible ? "Mutual swap possible" : "Paid stay only");
+  return parts.length > 0 ? parts.join(" · ") : "Complete your own profile to see compatibility";
 }

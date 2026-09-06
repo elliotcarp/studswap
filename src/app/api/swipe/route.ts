@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 
 const swipeSchema = z.object({
   targetId: z.string().min(1),
@@ -18,6 +19,9 @@ export async function POST(request: Request) {
   const swiperId = (session?.user as { id?: string } | undefined)?.id;
   if (!swiperId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  if (!rateLimit(`swipe:${swiperId}`, 200, 5 * 60 * 1000).allowed) {
+    return NextResponse.json({ error: "Slow down a bit and try again shortly." }, { status: 429 });
   }
 
   const body = await request.json().catch(() => null);

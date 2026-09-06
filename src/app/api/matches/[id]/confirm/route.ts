@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { createConfirmationCheckoutSession } from "@/lib/confirmationCharge";
 import { computeSettlement } from "@/lib/matchValidation";
+import { rateLimit } from "@/lib/rateLimit";
 
 // POST: start the €25 confirmation charge (€5 non-refundable service fee +
 // €20 refundable, refunded a day into the stay) for the current user.
@@ -16,6 +17,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  if (!rateLimit(`confirm:${userId}`, 10, 10 * 60 * 1000).allowed) {
+    return NextResponse.json({ error: "Slow down a bit and try again shortly." }, { status: 429 });
   }
 
   const match = await prisma.match.findUnique({ where: { id: params.id } });

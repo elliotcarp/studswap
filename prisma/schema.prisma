@@ -1,13 +1,18 @@
 // StudSwap data model
 // Dev: SQLite (file-based, zero setup)
-// Prod: switch provider to "postgresql" and set DATABASE_URL to your Neon connection string
+// Prod: Postgres/Neon
+//
+// The `provider` below is kept in sync with DATABASE_URL automatically by
+// scripts/set-prisma-provider.js (wired into npm run dev/build/prisma:*
+// and the vitest global setup) — don't hand-edit it, it'll just get
+// overwritten the next time one of those runs.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -109,13 +114,29 @@ model Profile {
   program       String
   yearOfStudy   String   // "1st year" | "2nd year" | "3rd year" | "Master's" | "PhD"
   homeCity      String
-  // Exact street address. Only ever shown to the other side of a confirmed
-  // match, or on your own profile, never on the public swipe card, so a
-  // random stranger browsing can't see where you live.
+  // Approximate area/district, shown publicly on the card (unlike the exact
+  // address below) — added at listing edit time, not onboarding, since it's
+  // supplementary detail rather than essential setup.
+  neighbourhood String?
+  // Exact street address. Only ever shown to the other side once matched,
+  // or on your own profile, never on the public swipe card, so a random
+  // stranger browsing can't see where you live.
   address       String?
   availableFrom DateTime
   availableTo   DateTime
   accommodates  Int      // how many people the flat can host
+  // "Entire flat" | "Private room" | "Shared room". Added at listing edit
+  // time, not onboarding — null until the owner sets it there.
+  roomType      String?
+  // JSON-encoded string array of selected amenities (see AMENITY_OPTIONS in
+  // onboardingOptions.ts), e.g. '["Wifi","Washing machine"]'. Same pattern
+  // as selfPhotoUrls/flatPhotoUrls below. Added at listing edit time, not
+  // onboarding.
+  amenities     String   @default("[]")
+  // "Mutual swap only" | "Paid stay only" | "Either" — collected during
+  // onboarding (essential setup) since it changes what a listing is even
+  // useful for. Defaults to "Either" for rows that predate this field.
+  arrangementPreference String @default("Either")
   // Short-term rental registration number for the accommodation, required
   // under EU Regulation 2024/1028 wherever the city it's in runs a
   // registration scheme — collected at listing creation because any listing

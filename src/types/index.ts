@@ -11,10 +11,19 @@ export interface ProfileFormData {
   program: string;
   yearOfStudy: string;
   homeCity: string;
-  address: string; // exact street address; only shown within a confirmed match, see ProfileCard's showAddress prop
+  // Approximate area/district, shown publicly on the card. Added at listing
+  // edit time, not onboarding — see Profile.neighbourhood.
+  neighbourhood: string;
+  address: string; // exact street address; only shown once matched, see ProfileCard's showAddress prop
   availableFrom: string; // yyyy-mm-dd
   availableTo: string; // yyyy-mm-dd
   accommodates: string; // "1" | "2" | "3" | "4" | "5+"
+  // "Entire flat" | "Private room" | "Shared room" | "" (not set). Added at
+  // listing edit time, not onboarding — see Profile.roomType.
+  roomType: string;
+  // Selected from AMENITY_OPTIONS. Added at listing edit time, not
+  // onboarding — see Profile.amenities.
+  amenities: string[];
   pricePerDayCents: string; // numeric string, form input value, in cents (EUR)
   // Optional flat monthly rate for long stays, empty string if not set —
   // never used in settlement math, purely a second informational number
@@ -22,6 +31,9 @@ export interface ProfileFormData {
   pricePerMonthCents: string;
   smoker: string;
   pets: string;
+  // "Mutual swap only" | "Paid stay only" | "Either" — collected during
+  // onboarding, see Profile.arrangementPreference.
+  arrangementPreference: string;
   selfPhotoUrls: string[]; // photos of the person; [0] is the profile picture
   // Photos of the flat; [0] is the cover photo — shown before selfPhotoUrls
   // on ProfileCard, since the flat is what leads a StudSwap card.
@@ -58,6 +70,17 @@ export interface RatingSummary {
 export interface ProfileCardData extends ProfileFormData {
   userId: string;
   ratingSummary: RatingSummary;
+  // Computed relative to the viewer's own profile, discovery context only
+  // (see /api/profile GET) — undefined anywhere else a ProfileCard is shown
+  // (match chat, profile preview), where "relative to the viewer" doesn't
+  // apply. Null overlap means the viewer has no dates of their own yet to
+  // compare against, not that there's no overlap.
+  overlapWithViewerDays?: number | null;
+  // Both sides' arrangementPreference allow a swap — the closest read of
+  // "is a mutual swap possible" available without a stored desired
+  // destination (see conversation: destination-city matching was explicitly
+  // deferred, this is not "they want to go to your city").
+  mutualSwapPossible?: boolean;
 }
 
 export type SwipeDirection = "LEFT" | "RIGHT";

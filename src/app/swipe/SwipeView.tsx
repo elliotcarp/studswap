@@ -40,12 +40,16 @@ export default function SwipeView({
   myCity,
   selfPhotoCount: initialSelfPhotoCount,
   flatPhotoCount: initialFlatPhotoCount,
+  promptCount: initialPromptCount,
+  hasPaymentMethod: initialHasPaymentMethod,
 }: {
   defaultTripFrom: string;
   defaultTripTo: string;
   myCity: string;
   selfPhotoCount: number;
   flatPhotoCount: number;
+  promptCount: number;
+  hasPaymentMethod: boolean;
 }) {
   const [filters, setFilters] = useState<CandidateFilters>({
     city: "",
@@ -59,20 +63,22 @@ export default function SwipeView({
   const [profiles, setProfiles] = useState<ProfileCardData[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [match, setMatch] = useState<{ matchId: string; otherName: string; otherCity: string } | null>(null);
-  const [photoCounts, setPhotoCounts] = useState({
+  const [completion, setCompletion] = useState({
     selfPhotoCount: initialSelfPhotoCount,
     flatPhotoCount: initialFlatPhotoCount,
+    promptCount: initialPromptCount,
+    hasPaymentMethod: initialHasPaymentMethod,
   });
 
-  // The server-rendered initial counts above can go stale if photos were
+  // The server-rendered initial counts above can go stale if the profile was
   // edited on /profile and the browser served this page back out of Next's
   // client-side Router Cache — this re-fetches fresh on every mount (i.e.
-  // every time someone navigates here) so the banner below never shows a
-  // photo count that's already been fixed.
+  // every time someone navigates here) so the banner below never shows
+  // counts that have already been fixed.
   useEffect(() => {
     fetch("/api/user/photo-counts")
       .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => setPhotoCounts(data))
+      .then((data) => setCompletion(data))
       .catch(() => {
         // Best-effort: keep showing the server-rendered counts on failure.
       });
@@ -129,8 +135,10 @@ export default function SwipeView({
       </div>
 
       <ProfileCompletionBanner
-        selfPhotoCount={photoCounts.selfPhotoCount}
-        flatPhotoCount={photoCounts.flatPhotoCount}
+        selfPhotoCount={completion.selfPhotoCount}
+        flatPhotoCount={completion.flatPhotoCount}
+        promptCount={completion.promptCount}
+        hasPaymentMethod={completion.hasPaymentMethod}
       />
 
       {error && <p className="text-sm text-red-600">{error}</p>}

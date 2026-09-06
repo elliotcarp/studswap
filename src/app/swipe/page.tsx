@@ -14,10 +14,15 @@ export default async function SwipePage() {
     redirect("/signup");
   }
 
-  const profile = await prisma.profile.findUnique({ where: { userId } });
+  const profile = await prisma.profile.findUnique({
+    where: { userId },
+    include: { user: { select: { paymentMethod: true, paymentHandle: true } } },
+  });
   if (!profile) {
     redirect("/onboarding");
   }
+
+  const prompts = JSON.parse(profile.prompts) as { question: string; answer: string }[];
 
   return (
     <>
@@ -27,6 +32,8 @@ export default async function SwipePage() {
         myCity={profile.homeCity}
         selfPhotoCount={(JSON.parse(profile.selfPhotoUrls) as string[]).length}
         flatPhotoCount={(JSON.parse(profile.flatPhotoUrls) as string[]).length}
+        promptCount={prompts.filter((p) => p.question && p.answer.trim().length > 0).length}
+        hasPaymentMethod={Boolean(profile.user.paymentMethod && profile.user.paymentHandle)}
       />
       <Navbar />
     </>

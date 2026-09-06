@@ -7,10 +7,14 @@ import {
   ACCOMMODATES_OPTIONS,
   MAX_SELF_PHOTO_COUNT,
   MAX_FLAT_PHOTO_COUNT,
+  MIN_FLAT_PHOTO_COUNT,
+  ROOM_TYPE_OPTIONS,
+  AMENITY_OPTIONS,
+  ARRANGEMENT_PREFERENCE_OPTIONS,
   accommodatesLabelToInt,
 } from "@/lib/onboardingOptions";
 import { EUROPEAN_CITIES } from "@/lib/cities";
-import { MAX_PROMPT_COUNT, MIN_PROMPT_COUNT, PROMPTS } from "@/lib/prompts";
+import { MAX_PROMPT_COUNT, PROMPTS } from "@/lib/prompts";
 import { toProfileCardData } from "@/lib/profileMapping";
 import { stayDurationDays } from "@/lib/pricing";
 import type { ProfileCardData } from "@/types";
@@ -30,13 +34,31 @@ const profileSchema = z
     homeCity: z.enum(EUROPEAN_CITIES as [string, ...string[]], {
       errorMap: () => ({ message: "Pick a city from the list" }),
     }),
+    // Optional: approximate area/district, shown publicly on the card
+    // (unlike address below). Added at listing edit time, not onboarding.
+    neighbourhood: z.string().trim().max(100).optional().default(""),
     // Optional: not everyone will want to add this right away, and it's
     // never shown publicly anyway (see ProfileCard's showAddress prop), only
-    // to the other side of a confirmed match.
+    // to the other side once matched.
     address: z.string().trim().max(200),
     availableFrom: z.coerce.date(),
     availableTo: z.coerce.date(),
     accommodates: z.enum(ACCOMMODATES_OPTIONS as [string, ...string[]]),
+    // Optional (empty string = not set yet): added at listing edit time, not
+    // onboarding, so pre-existing and freshly-onboarded profiles both start
+    // without one.
+    roomType: z
+      .string()
+      .trim()
+      .refine((v) => v === "" || (ROOM_TYPE_OPTIONS as string[]).includes(v), "Invalid room type")
+      .optional()
+      .default(""),
+    amenities: z
+      .array(z.string())
+      .max(AMENITY_OPTIONS.length)
+      .refine((arr) => arr.every((a) => (AMENITY_OPTIONS as string[]).includes(a)), "Invalid amenity")
+      .optional()
+      .default([]),
     // In cents. StudSwap never collects or moves this money — it's only
     // used to calculate and display the stay cost / fairness difference
     // between two profiles, see Match.settlementAmountCents.
@@ -56,8 +78,15 @@ const profileSchema = z
       .refine((v) => v === null || (Number.isInteger(v) && v >= 100 && v <= 2000000), {
         message: "Enter a valid monthly price",
       }),
-    smoker: z.string().trim().min(1),
-    pets: z.string().trim().min(1),
+    // Not required: deferred to the post-onboarding checklist rather than
+    // essential setup (see OnboardingWizard.tsx) — empty string means unset.
+    smoker: z.string().trim(),
+    pets: z.string().trim(),
+    // Required: collected during onboarding (essential setup), since it
+    // changes what a listing is even useful for.
+    arrangementPreference: z.enum(ARRANGEMENT_PREFERENCE_OPTIONS as [string, ...string[]], {
+      errorMap: () => ({ message: "Pick an arrangement preference" }),
+    }),
     // Relative paths (local disk storage, e.g. "/uploads/xyz.png") as well as
     // absolute URLs (Vercel Blob in prod) are valid, so just require non-empty.
     // Onboarding's photo steps are skippable (see OnboardingWizard.tsx) —
@@ -75,10 +104,9 @@ const profileSchema = z
     // for accounts that predate this field (their value loads as "").
     selfDescription: z.string().trim().max(1000),
     flatDescription: z.string().trim().max(1000),
-    prompts: z
-      .array(promptSchema)
-      .min(MIN_PROMPT_COUNT, `Answer at least ${MIN_PROMPT_COUNT} prompts`)
-      .max(MAX_PROMPT_COUNT),
+    // Not required: deferred to the post-onboarding checklist rather than
+    // essential setup (see OnboardingWizard.tsx and ProfileCompletionBanner).
+    prompts: z.array(promptSchema).max(MAX_PROMPT_COUNT),
     // Short-term rental registration number (EU 2024/1028) — collected at
     // listing creation because any listing could end up as a one-directional
     // stay. Not required here, same reasoning as selfDescription/
@@ -123,14 +151,18 @@ export async function POST(request: Request) {
     program,
     yearOfStudy,
     homeCity,
+    neighbourhood,
     address,
     availableFrom,
     availableTo,
     accommodates,
+    roomType,
+    amenities,
     pricePerDayCents,
     pricePerMonthCents,
     smoker,
     pets,
+    arrangementPreference,
     selfPhotoUrls,
     flatPhotoUrls,
     flatVideoUrl,
@@ -148,14 +180,18 @@ export async function POST(request: Request) {
     program,
     yearOfStudy,
     homeCity,
+    neighbourhood: neighbourhood || null,
     address,
     availableFrom,
     availableTo,
     accommodates: accommodatesLabelToInt(accommodates),
+    roomType: roomType || null,
+    amenities: JSON.stringify(amenities),
     pricePerDayCents,
     pricePerMonthCents,
     smoker,
     pets,
+    arrangementPreference,
     selfPhotoUrls: JSON.stringify(selfPhotoUrls),
     flatPhotoUrls: JSON.stringify(flatPhotoUrls),
     flatVideoUrl: flatVideoUrl || null,
@@ -212,10 +248,19 @@ export async function GET(request: Request) {
   const hasValidTripRange =
     tripFrom && tripTo && !Number.isNaN(tripFrom.getTime()) && !Number.isNaN(tripTo.getTime());
 
-  const alreadySwiped = await prisma.swipe.findMany({
-    where: { swiperId: userId },
-    select: { targetId: true },
-  });
+  const [alreadySwiped, myProfile] = await Promise.all([
+    prisma.swipe.findMany({
+      where: { swiperId: userId },
+      select: { targetId: true },
+    }),
+    // Only for the viewer-relative "overlap with your dates" / "mutual swap
+    // possible" fields below — the discovery pool itself isn't restricted by
+    // whether the viewer has finished their own profile.
+    prisma.profile.findUnique({
+      where: { userId },
+      select: { availableFrom: true, availableTo: true, arrangementPreference: true },
+    }),
+  ]);
 
   const profiles = await prisma.profile.findMany({
     where: {
@@ -244,6 +289,22 @@ export async function GET(request: Request) {
   });
 
   const filtered = withOverlap.filter(({ profile: p, overlapDays }) => {
+    // Photos are still skippable in onboarding (see OnboardingWizard.tsx) so
+    // signup itself stays quick, but a listing with no photos of the person
+    // or the flat shouldn't be shown to other students as a real listing —
+    // it's not one yet. Dates and price don't need an equivalent check here:
+    // they're required, non-skippable onboarding steps (see the wizard), so
+    // every Profile row already has real, user-entered values for both.
+    let selfPhotoCount = 0;
+    let flatPhotoCount = 0;
+    try {
+      selfPhotoCount = (JSON.parse(p.selfPhotoUrls) as string[]).length;
+      flatPhotoCount = (JSON.parse(p.flatPhotoUrls) as string[]).length;
+    } catch {
+      // Malformed JSON reads as "no photos" — fails closed, same as missing.
+    }
+    if (selfPhotoCount < 1 || flatPhotoCount < MIN_FLAT_PHOTO_COUNT) return false;
+
     if (city && p.homeCity !== city) return false;
     if (minAccommodates && p.accommodates < minAccommodates) return false;
 
@@ -265,7 +326,24 @@ export async function GET(request: Request) {
     (a, b) => b.overlapDays - a.overlapDays || b.profile.createdAt.getTime() - a.profile.createdAt.getTime()
   );
 
-  const results: ProfileCardData[] = filtered.map(({ profile: p }) => toProfileCardData(p.userId, p));
+  // Viewer-relative fields, computed against the viewer's OWN profile dates
+  // (not the ad hoc search filter above, which is just for narrowing this
+  // query) — see ProfileCardData.overlapWithViewerDays/mutualSwapPossible.
+  const results: ProfileCardData[] = filtered.map(({ profile: p }) => {
+    const card = toProfileCardData(p.userId, p);
+    // Left undefined (not null/false) when the viewer has no profile of
+    // their own yet — there's nothing true to compute against, and a
+    // hardcoded fallback here would misreport every candidate the same way
+    // regardless of what they actually offer.
+    if (myProfile) {
+      const overlapStartMs = Math.max(p.availableFrom.getTime(), myProfile.availableFrom.getTime());
+      const overlapEndMs = Math.min(p.availableTo.getTime(), myProfile.availableTo.getTime());
+      card.overlapWithViewerDays = Math.max(0, Math.round((overlapEndMs - overlapStartMs) / (1000 * 60 * 60 * 24)));
+      card.mutualSwapPossible =
+        p.arrangementPreference !== "Paid stay only" && myProfile.arrangementPreference !== "Paid stay only";
+    }
+    return card;
+  });
 
   return NextResponse.json({ profiles: results });
 }

@@ -4,6 +4,13 @@
 // with a progress-dot header and a circular next/back nav, like Hinge's own
 // account-setup flow (see reference screenshots) but for a flat-swap profile
 // instead of a dating profile.
+//
+// Deliberately short: only what's essential to a usable listing (identity,
+// city, dates, capacity, arrangement type, price, compliance) — everything
+// else (address, smoker/pets, descriptions, photos, prompts, payment,
+// room type, amenities, neighbourhood) is deferred to the post-entry
+// completion checklist on /profile (see ProfileCompletionBanner) instead of
+// blocking the student from reaching the app at all.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,24 +20,19 @@ import { estimateDayRateFromMonthlyRentCents } from "@/lib/pricing";
 import CityPicker from "@/components/CityPicker";
 import { EUROPEAN_CITIES } from "@/lib/cities";
 import ChipSelect from "@/components/onboarding/ChipSelect";
-import PhotoGridEditor from "@/components/onboarding/PhotoGridEditor";
-import VideoUploader from "@/components/onboarding/VideoUploader";
-import PromptsEditor from "@/components/onboarding/PromptsEditor";
-import PaymentMethodEditor from "@/components/PaymentMethodEditor";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
 import {
   YEAR_OF_STUDY_OPTIONS,
-  SMOKER_OPTIONS,
-  PETS_OPTIONS,
   ACCOMMODATES_OPTIONS,
-  MIN_SELF_PHOTO_COUNT,
-  MAX_SELF_PHOTO_COUNT,
-  MIN_FLAT_PHOTO_COUNT,
-  MAX_FLAT_PHOTO_COUNT,
+  ARRANGEMENT_PREFERENCE_OPTIONS,
 } from "@/lib/onboardingOptions";
-import { MIN_PROMPT_COUNT } from "@/lib/prompts";
 import type { ProfileFormData } from "@/types";
 
+// Fields not collected by this wizard (address, smoker/pets, descriptions,
+// photos, prompts, room type, amenities, neighbourhood) start empty and are
+// filled in later via the post-entry completion checklist on /profile —
+// ProfileFormData still needs a value for all of them since it's the shared
+// shape with the profile edit page.
 const EMPTY_PROFILE: ProfileFormData = {
   name: "",
   age: "",
@@ -38,14 +40,18 @@ const EMPTY_PROFILE: ProfileFormData = {
   program: "",
   yearOfStudy: "",
   homeCity: "",
+  neighbourhood: "",
   address: "",
   availableFrom: "",
   availableTo: "",
   accommodates: "",
+  roomType: "",
+  amenities: [],
   pricePerDayCents: "",
   pricePerMonthCents: "",
   smoker: "",
   pets: "",
+  arrangementPreference: "",
   selfPhotoUrls: [],
   flatPhotoUrls: [],
   flatVideoUrl: "",
@@ -56,44 +62,20 @@ const EMPTY_PROFILE: ProfileFormData = {
   shortTermRentalRegistrationExempt: false,
 };
 
-// Not part of ProfileFormData (it lives on User, not Profile — saved via a
-// separate call to /api/user/payment-handle, see handleNext), but collected
-// in the same wizard flow since the brief wants it asked for at listing
-// creation, not mid-confirmation.
-interface PaymentDestination {
-  paymentMethod: string;
-  paymentHandle: string;
-  paymentHandleAccountName: string;
-}
-const EMPTY_PAYMENT_DESTINATION: PaymentDestination = {
-  paymentMethod: "",
-  paymentHandle: "",
-  paymentHandleAccountName: "",
-};
-
-// Combined wizard state: the Profile fields (saved via POST /api/profile)
-// plus the payment destination (User fields, saved via PUT
-// /api/user/payment-handle) — collected in the same flow since the brief
-// wants payment details asked for at listing creation, not confirmation,
-// but they're two separate API calls on submit (see handleNext).
-type WizardData = ProfileFormData & PaymentDestination;
-const EMPTY_WIZARD_DATA: WizardData = { ...EMPTY_PROFILE, ...EMPTY_PAYMENT_DESTINATION };
+type WizardData = ProfileFormData;
+const EMPTY_WIZARD_DATA: WizardData = EMPTY_PROFILE;
 
 type SetField = <K extends keyof WizardData>(key: K, value: WizardData[K]) => void;
 
 interface StepDef {
   icon: string;
   title: string;
-  subtitle?: string;
+  // A function lets a later step's copy react to an earlier answer (e.g.
+  // the price step explaining itself differently depending on the chosen
+  // arrangement preference).
+  subtitle?: string | ((data: WizardData) => string);
   render: (data: WizardData, setField: SetField) => React.ReactNode;
   isValid: (data: WizardData) => boolean;
-  // When present, a "Skip for now" link is shown on this step. Called before
-  // advancing so it can backfill sensible defaults for fields the backend
-  // still requires (e.g. availability dates, a day price) — only ever
-  // filling a field that's still empty, never overwriting something the
-  // student already typed. A no-op function just surfaces the button for a
-  // step that's already valid empty (photos, address).
-  onSkip?: (data: WizardData, setField: SetField) => void;
 }
 
 function textInputStep(
@@ -108,32 +90,6 @@ function textInputStep(
     render: (data, setField) => (
       <Input
         autoFocus
-        value={data[field] as string}
-        onChange={(e) => setField(field, e.target.value as never)}
-        placeholder={placeholder}
-        className="text-lg"
-      />
-    ),
-    isValid: (data) => (data[field] as string).trim().length > 0,
-  };
-}
-
-function textAreaStep(
-  field: keyof WizardData,
-  icon: string,
-  title: string,
-  placeholder: string,
-  subtitle?: string
-): StepDef {
-  return {
-    icon,
-    title,
-    subtitle,
-    render: (data, setField) => (
-      <Textarea
-        autoFocus
-        rows={6}
-        maxLength={1000}
         value={data[field] as string}
         onChange={(e) => setField(field, e.target.value as never)}
         placeholder={placeholder}
@@ -166,27 +122,6 @@ function chipStep(
 
 const MIN_AGE = 16;
 const MAX_AGE = 99;
-
-// Placeholder availability window for anyone who skips the dates step
-// entirely, rather than a today-to-today range that would fail the "to
-// after from" check downstream. Two weeks out (so it doesn't read as
-// available right now) for roughly a semester (matches the app's own
-// long-stay threshold) — a stand-in the student is expected to come back
-// and correct, not a real answer.
-// Placeholder day price for anyone who skips the pricing step entirely,
-// since Profile.pricePerDayCents is a required, non-nullable column (it
-// feeds settlement math elsewhere). A round, plausible student-flat number,
-// not a real answer, the same idea as defaultAvailabilityDates below.
-const DEFAULT_DAY_PRICE_CENTS = 3000;
-
-function defaultAvailabilityDates(): { from: string; to: string } {
-  const from = new Date();
-  from.setDate(from.getDate() + 14);
-  const to = new Date(from);
-  to.setDate(to.getDate() + 180);
-  const toInputValue = (d: Date) => d.toISOString().slice(0, 10);
-  return { from: toInputValue(from), to: toInputValue(to) };
-}
 
 const STEPS: StepDef[] = [
   textInputStep("name", "👤", "What's your name?", "Your name"),
@@ -224,22 +159,6 @@ const STEPS: StepDef[] = [
     isValid: (data) => EUROPEAN_CITIES.includes(data.homeCity),
   },
   {
-    icon: "📍",
-    title: "What's the exact address?",
-    subtitle: "Optional for now. Only shown to someone once you've matched, never on your public card.",
-    render: (data, setField) => (
-      <Input
-        autoFocus
-        value={data.address}
-        onChange={(e) => setField("address", e.target.value)}
-        placeholder="Street and number"
-        className="text-lg"
-      />
-    ),
-    isValid: () => true,
-    onSkip: () => {},
-  },
-  {
     icon: "📅",
     title: "When's your flat available?",
     subtitle: "This is when YOUR flat is free for someone else to stay in it.",
@@ -267,20 +186,36 @@ const STEPS: StepDef[] = [
         </div>
       </div>
     ),
+    // Not skippable: a listing with no real availability window is unusable
+    // (and used to get a fabricated placeholder range silently written to
+    // it instead — see git history). Dates are essential, not optional.
     isValid: (data) =>
       data.availableFrom.length > 0 && data.availableTo.length > 0 && data.availableTo > data.availableFrom,
-    onSkip: (data, setField) => {
-      if (data.availableFrom && data.availableTo) return;
-      const { from, to } = defaultAvailabilityDates();
-      if (!data.availableFrom) setField("availableFrom", from);
-      if (!data.availableTo) setField("availableTo", to);
-    },
   },
   chipStep("accommodates", "👥", "How many people can your flat host?", ACCOMMODATES_OPTIONS),
   {
+    icon: "🔁",
+    title: "What are you open to?",
+    subtitle:
+      "A mutual swap: you stay at their place while they stay at yours. A paid stay: someone books your place directly, no swap back required.",
+    render: (data, setField) => (
+      <ChipSelect
+        options={ARRANGEMENT_PREFERENCE_OPTIONS}
+        value={data.arrangementPreference}
+        onChange={(value) => setField("arrangementPreference", value)}
+      />
+    ),
+    isValid: (data) => data.arrangementPreference.length > 0,
+  },
+  {
     icon: "💶",
     title: "What's a fair price?",
-    subtitle: "You're a student helping another student out for a semester, not running a rental business.",
+    subtitle: (data) =>
+      data.arrangementPreference === "Mutual swap only"
+        ? "Used only to calculate the fairness gap between your flat and a swap partner's — you're never charged or paid this directly, you just settle the difference between you."
+        : data.arrangementPreference === "Paid stay only"
+          ? "This is what you'll actually charge someone to book your place directly, paid person-to-person, StudSwap never touches it."
+          : "For a swap, this is only used to calculate the fairness gap with a partner's place. For a paid stay, it's what you'll actually charge, person-to-person.",
     render: (data, setField) => (
       <div className="flex flex-col gap-4">
           <div>
@@ -338,6 +273,10 @@ const STEPS: StepDef[] = [
           </div>
       </div>
     ),
+    // Not skippable: a listing with no deliberately-set price used to get a
+    // fabricated placeholder (€30/day) silently written to it instead — see
+    // git history. A price is essential, not optional, even though it's
+    // only ever used for display/settlement math, never charged by us.
     isValid: (data) => {
       const dayPrice = Number(data.pricePerDayCents);
       if (!Number.isInteger(dayPrice) || dayPrice < 100) return false;
@@ -345,103 +284,6 @@ const STEPS: StepDef[] = [
       const monthPrice = Number(data.pricePerMonthCents);
       return Number.isInteger(monthPrice) && monthPrice >= 100;
     },
-    onSkip: (data, setField) => {
-      if (!data.pricePerDayCents) setField("pricePerDayCents", String(DEFAULT_DAY_PRICE_CENTS));
-    },
-  },
-  chipStep("smoker", "🚬", "Do you smoke?", SMOKER_OPTIONS),
-  chipStep("pets", "🐾", "Pets at home?", PETS_OPTIONS),
-  textAreaStep(
-    "selfDescription",
-    "📝",
-    "Describe yourself",
-    "A bit about who you are, your habits, what you're like to share a home with…"
-  ),
-  textAreaStep(
-    "flatDescription",
-    "🏡",
-    "Describe your flat",
-    "What's it like, what's nearby, anything a swap partner should know…"
-  ),
-  {
-    icon: "🖼️",
-    title: "Add photos of you",
-    subtitle: `Recommended: at least ${MIN_SELF_PHOTO_COUNT}, up to ${MAX_SELF_PHOTO_COUNT}.`,
-    render: (data, setField) => (
-      <PhotoGridEditor
-        photoUrls={data.selfPhotoUrls}
-        onChange={(urls) => setField("selfPhotoUrls", urls)}
-        minCount={MIN_SELF_PHOTO_COUNT}
-        maxCount={MAX_SELF_PHOTO_COUNT}
-        markProfilePicture
-        minIsRecommended
-      />
-    ),
-    // Skippable: photos matter a lot for matching, but forcing them here
-    // just loses people mid-signup. See ProfileCompletionBanner for the
-    // Hinge-style nudge that follows up on this after onboarding.
-    isValid: () => true,
-    onSkip: () => {},
-  },
-  {
-    icon: "🏡",
-    title: "Add photos of your flat",
-    subtitle: `Recommended: at least ${MIN_FLAT_PHOTO_COUNT}, up to ${MAX_FLAT_PHOTO_COUNT}.`,
-    render: (data, setField) => (
-      <PhotoGridEditor
-        photoUrls={data.flatPhotoUrls}
-        onChange={(urls) => setField("flatPhotoUrls", urls)}
-        minCount={MIN_FLAT_PHOTO_COUNT}
-        maxCount={MAX_FLAT_PHOTO_COUNT}
-        markProfilePicture
-        coverLabel="Cover photo"
-        minIsRecommended
-      />
-    ),
-    isValid: () => true,
-    onSkip: () => {},
-  },
-  {
-    icon: "🎬",
-    title: "Add a video of your flat",
-    subtitle: "Optional. A quick walkthrough gives a much better sense of the place than photos alone.",
-    render: (data, setField) => (
-      <VideoUploader value={data.flatVideoUrl} onChange={(url) => setField("flatVideoUrl", url)} />
-    ),
-    isValid: () => true,
-    onSkip: () => {},
-  },
-  {
-    icon: "💬",
-    title: "Write your profile answers",
-    subtitle: `${MIN_PROMPT_COUNT} required`,
-    render: (data, setField) => (
-      <PromptsEditor prompts={data.prompts} onChange={(prompts) => setField("prompts", prompts)} />
-    ),
-    isValid: (data) =>
-      data.prompts.filter((p) => p.question && p.answer.trim().length > 0).length >= MIN_PROMPT_COUNT,
-  },
-  {
-    icon: "💸",
-    title: "How should people pay you?",
-    subtitle:
-      "Optional for now, you can skip this and add it later. Shown to a matched counterpart only after you've both confirmed and paid, so they can pay you directly; you'll just need to add it before you can confirm a swap where you're owed money. StudSwap never touches this money.",
-    render: (data, setField) => (
-      <PaymentMethodEditor
-        value={data}
-        onChange={(next) => {
-          setField("paymentMethod", next.paymentMethod);
-          setField("paymentHandle", next.paymentHandle);
-          setField("paymentHandleAccountName", next.paymentHandleAccountName);
-        }}
-        autoFocus
-      />
-    ),
-    // Skippable: /api/matches/[id]/confirm already blocks confirming a match
-    // where this user is owed money until they've filled this in, so there's
-    // no need to force it at listing creation.
-    isValid: () => true,
-    onSkip: () => {},
   },
   {
     icon: "📋",
@@ -505,33 +347,14 @@ export default function OnboardingWizard({ initialProfile }: { initialProfile?: 
     setSubmitting(true);
     setError(null);
     try {
-      // A prompt slot can have a question picked but no answer typed yet (e.g.
-      // the optional 3rd one), only complete prompts should ever be submitted.
-      const { paymentMethod, paymentHandle, paymentHandleAccountName, ...profileData } = data;
-      const payload = {
-        ...profileData,
-        prompts: profileData.prompts.filter((p) => p.question && p.answer.trim().length > 0),
-      };
-      const [profileRes, paymentHandleRes] = await Promise.all([
-        fetch("/api/profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }),
-        fetch("/api/user/payment-handle", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentMethod, paymentHandle, paymentHandleAccountName }),
-        }),
-      ]);
+      const profileRes = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
       if (!profileRes.ok) {
         const body = await profileRes.json().catch(() => null);
         setError(body?.error ?? "Could not save your profile. Please check the form and try again.");
-        setSubmitting(false);
-        return;
-      }
-      if (!paymentHandleRes.ok) {
-        setError("Could not save your payment details. Please try again.");
         setSubmitting(false);
         return;
       }
@@ -540,16 +363,6 @@ export default function OnboardingWizard({ initialProfile }: { initialProfile?: 
       setError("Could not save your profile. Please try again.");
       setSubmitting(false);
     }
-  }
-
-  // None of the skippable steps are the last one (registration, which isn't
-  // skippable, always is), so this only ever needs to advance the index,
-  // never submit.
-  function handleSkip() {
-    if (!step.onSkip) return;
-    step.onSkip(data, setField);
-    setDirection(1);
-    setStepIndex((i) => i + 1);
   }
 
   function handleBack() {
@@ -645,7 +458,11 @@ export default function OnboardingWizard({ initialProfile }: { initialProfile?: 
           >
             <span className="mb-3 text-3xl">{step.icon}</span>
             <h1 className="font-display text-2xl font-bold">{step.title}</h1>
-            {step.subtitle && <p className="mb-2 text-sm text-gray-400">{step.subtitle}</p>}
+            {step.subtitle && (
+              <p className="mb-2 text-sm text-gray-400">
+                {typeof step.subtitle === "function" ? step.subtitle(data) : step.subtitle}
+              </p>
+            )}
             <div className="mt-4">{step.render(data, setField)}</div>
           </motion.div>
         </AnimatePresence>
@@ -653,18 +470,7 @@ export default function OnboardingWizard({ initialProfile }: { initialProfile?: 
 
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
 
-      <div className="flex items-center justify-between">
-        {step.onSkip ? (
-          <button
-            type="button"
-            onClick={handleSkip}
-            className="text-sm font-semibold text-gray-600 underline underline-offset-2 active:scale-95"
-          >
-            Skip for now
-          </button>
-        ) : (
-          <span />
-        )}
+      <div className="flex items-center justify-end">
         <button
           type="button"
           onClick={handleNext}

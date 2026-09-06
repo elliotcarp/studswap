@@ -20,3 +20,24 @@ export const MIN_SELF_PHOTO_COUNT = 2;
 export const MAX_SELF_PHOTO_COUNT = 5;
 export const MIN_FLAT_PHOTO_COUNT = 4;
 export const MAX_FLAT_PHOTO_COUNT = 8;
+
+// Collected during onboarding (essential setup) — it changes what a listing
+// is even useful for, so it's asked upfront rather than deferred.
+export const ARRANGEMENT_PREFERENCE_OPTIONS = ["Mutual swap only", "Paid stay only", "Either"];
+
+// Added at listing edit time, not onboarding — supplementary detail, not
+// essential setup.
+export const ROOM_TYPE_OPTIONS = ["Entire flat", "Private room", "Shared room"];
+
+export const AMENITY_OPTIONS = [
+  "Wifi",
+  "Washing machine",
+  "Dishwasher",
+  "Air conditioning",
+  "Heating",
+  "Workspace",
+  "TV",
+  "Parking",
+  "Elevator",
+  "Balcony",
+];

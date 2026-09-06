@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 
 const proposeSchema = z
   .object({
@@ -39,6 +40,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  if (!rateLimit(`propose:${userId}`, 20, 10 * 60 * 1000).allowed) {
+    return NextResponse.json({ error: "Slow down a bit and try again shortly." }, { status: 429 });
   }
 
   const match = await prisma.match.findUnique({

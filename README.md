@@ -74,7 +74,7 @@ prisma/
 ## Deploying
 
 1. Push to GitHub, import into Vercel
-2. Provision a [Neon](https://neon.tech) Postgres database, set `DATABASE_URL` in Vercel env vars, switch `provider` in `schema.prisma` to `"postgresql"`, run `npx prisma migrate deploy`
+2. Provision a [Neon](https://neon.tech) Postgres database, set `DATABASE_URL` in Vercel env vars (the build automatically points `schema.prisma` at the right provider based on `DATABASE_URL`, see `scripts/set-prisma-provider.js`), run `npx prisma migrate deploy`
 3. Set up an SMTP provider (e.g. Resend) for magic-link emails
 4. Enable Vercel Blob storage, add live Stripe keys, and set `ANTHROPIC_API_KEY` if you want the AI domain fallback
 

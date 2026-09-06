@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import { isAllowedUniversityEmailWithAIFallback } from "@/lib/allowedDomains";
 import { verifyPassword } from "@/lib/password";
+import { rateLimit } from "@/lib/rateLimit";
 
 const adapter = PrismaAdapter(prisma);
 // @next-auth/prisma-adapter's deleteSession calls prisma.session.delete() with no
@@ -49,6 +50,11 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+        // Blunt credential-stuffing/brute-force against a single account —
+        // keyed by email rather than IP since that's the actual attack
+        // surface here (repeated password guesses against one target).
+        const key = `login:${credentials.email.toLowerCase()}`;
+        if (!rateLimit(key, 50, 60 * 60 * 1000).allowed) return null;
         const user = await prisma.user.findUnique({ where: { email: credentials.email } });
         if (!user?.passwordHash) return null;
         if (!verifyPassword(credentials.password, user.passwordHash)) return null;
@@ -57,9 +63,19 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    // Reject sign-in attempts from non-university email domains before a magic link is even sent
+    // Reject sign-in attempts from non-university email domains before a magic link is even sent.
+    // Only actually runs the (AI-fallback-including) check for a brand-new
+    // account — an existing User row means this email already passed it once
+    // (at credentials registration, or the first magic-link verification),
+    // and domains don't change, so every subsequent login shouldn't re-spend
+    // an AI call just because it happens to hit this callback again.
     async signIn({ user }) {
       if (!user.email) return false;
+      const existing = await prisma.user.findUnique({
+        where: { email: user.email },
+        select: { id: true },
+      });
+      if (existing) return true;
       return isAllowedUniversityEmailWithAIFallback(user.email);
     },
     // Credentials provider requires JWT sessions (no adapter-backed session row is

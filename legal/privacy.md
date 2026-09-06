@@ -30,9 +30,7 @@ Name, age, university, field of study, year of study, home city, availability da
 **Assume everything here is public to other students on the Platform.** Don't put anything in a free-text field or a photograph that you wouldn't want another user to see, screenshot, or keep.
 
 ### 2.3 Address data
-The full address of your accommodation. **Not** shown while browsing. Disclosed to the other party only once an arrangement is confirmed, because they need it to get there.
-
-`[DECISION] Confirm this matches the app. If the address, or a map pin precise enough to identify the building, is visible before confirmation, this section is wrong — and the product should probably change rather than the policy.`
+The full address of your accommodation. **Not** shown while browsing. Disclosed to the other party once you've matched (a mutual swap, or someone paying to book a one-directional stay), not only once the confirmation payment has gone through — matching is the point at which you're both discussing a specific, real stay and the address becomes relevant to that conversation.
 
 ### 2.4 Payment handle
 The bank or payment details you give us so another user can pay you — IBAN, Revolut tag, PayPal address or similar, and the account holder name.
