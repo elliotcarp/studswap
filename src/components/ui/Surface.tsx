@@ -11,11 +11,13 @@ import type { ReactNode } from "react";
 type SurfaceVariant = "flat" | "elevated" | "tinted";
 
 export default function Surface({
+  id,
   variant = "flat",
   className,
   onClick,
   children,
 }: {
+  id?: string;
   variant?: SurfaceVariant;
   className?: string;
   // Optional: makes the whole surface clickable (e.g. a list row whose
@@ -26,6 +28,7 @@ export default function Surface({
 }) {
   return (
     <div
+      id={id}
       onClick={onClick}
       className={clsx(
         "rounded-card",

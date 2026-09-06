@@ -9,10 +9,68 @@ import { AnimatePresence } from "framer-motion";
 import SwipeCardStack from "@/components/SwipeCardStack";
 import FilterPanel from "@/components/swipe/FilterPanel";
 import MatchReveal from "@/components/MatchReveal";
-import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
+import ProfileCompletionBanner, { type ChecklistItem } from "@/components/ProfileCompletionBanner";
 import { ProfileCardSkeleton } from "@/components/Skeleton";
 import Button from "@/components/ui/Button";
+import { MIN_SELF_PHOTO_COUNT, MIN_FLAT_PHOTO_COUNT } from "@/lib/onboardingOptions";
+import { MIN_PROMPT_COUNT } from "@/lib/prompts";
 import type { CandidateFilters, ProfileCardData, SwipeDirection } from "@/types";
+
+// Same priority as ProfileView.tsx's checklist (photos first, since they
+// gate discovery visibility itself), but only the three things this page
+// actually has counts for — the rest of the checklist needs the full
+// profile, only loaded on /profile.
+function topChecklistItem(completion: {
+  selfPhotoCount: number;
+  flatPhotoCount: number;
+  promptCount: number;
+  hasPaymentMethod: boolean;
+}): ChecklistItem | null {
+  const missingSelf = Math.max(0, MIN_SELF_PHOTO_COUNT - completion.selfPhotoCount);
+  const missingFlat = Math.max(0, MIN_FLAT_PHOTO_COUNT - completion.flatPhotoCount);
+  if (missingSelf > 0 || missingFlat > 0) {
+    const parts: string[] = [];
+    if (missingSelf > 0) parts.push(`${missingSelf} more photo${missingSelf === 1 ? "" : "s"} of you`);
+    if (missingFlat > 0) parts.push(`${missingFlat} more of your flat`);
+    return {
+      key: "photos",
+      icon: "📸",
+      message: (
+        <>
+          <strong>Add {parts.join(" and ")}.</strong> Your listing won&apos;t show to anyone until you do.
+        </>
+      ),
+    };
+  }
+  if (completion.promptCount < MIN_PROMPT_COUNT) {
+    const missing = MIN_PROMPT_COUNT - completion.promptCount;
+    return {
+      key: "prompts",
+      icon: "💬",
+      message: (
+        <>
+          <strong>
+            Answer {missing} more profile prompt{missing === 1 ? "" : "s"}.
+          </strong>{" "}
+          A little personality goes a long way in a swap decision.
+        </>
+      ),
+    };
+  }
+  if (!completion.hasPaymentMethod) {
+    return {
+      key: "payment",
+      icon: "💸",
+      message: (
+        <>
+          <strong>Add how you&apos;d like to get paid.</strong> You&apos;ll need this before you can confirm a
+          swap where you&apos;re owed money.
+        </>
+      ),
+    };
+  }
+  return null;
+}
 
 function buildQuery(filters: CandidateFilters): string {
   const params = new URLSearchParams();
@@ -134,12 +192,7 @@ export default function SwipeView({
         </Button>
       </div>
 
-      <ProfileCompletionBanner
-        selfPhotoCount={completion.selfPhotoCount}
-        flatPhotoCount={completion.flatPhotoCount}
-        promptCount={completion.promptCount}
-        hasPaymentMethod={completion.hasPaymentMethod}
-      />
+      <ProfileCompletionBanner item={topChecklistItem(completion)} />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

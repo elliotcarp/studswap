@@ -11,7 +11,7 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import CityPicker from "@/components/CityPicker";
 import ProfileCard from "@/components/ProfileCard";
-import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
+import ProfileCompletionBanner, { type ChecklistItem } from "@/components/ProfileCompletionBanner";
 import ChipSelect from "@/components/onboarding/ChipSelect";
 import MultiChipSelect from "@/components/onboarding/MultiChipSelect";
 import PhotoGridEditor from "@/components/onboarding/PhotoGridEditor";
@@ -34,6 +34,7 @@ import {
   MIN_FLAT_PHOTO_COUNT,
   MAX_FLAT_PHOTO_COUNT,
 } from "@/lib/onboardingOptions";
+import { MIN_PROMPT_COUNT } from "@/lib/prompts";
 import type { ProfileFormData, RatingSummary } from "@/types";
 
 type FieldKey = keyof ProfileFormData;
@@ -41,6 +42,131 @@ type SectionKey = "personal" | "accommodation" | "availability" | "preferences" 
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Priority-ordered: photos first (they gate discovery visibility itself),
+// then prompts and payment (explicitly named in the original brief), then
+// everything else one at a time — so the banner keeps pointing at the next
+// thing worth adding instead of stopping after the first three.
+function computeChecklist(profile: ProfileFormData, hasPaymentMethod: boolean): (ChecklistItem & { section: SectionKey })[] {
+  const items: (ChecklistItem & { section: SectionKey })[] = [];
+
+  const missingSelf = Math.max(0, MIN_SELF_PHOTO_COUNT - profile.selfPhotoUrls.length);
+  const missingFlat = Math.max(0, MIN_FLAT_PHOTO_COUNT - profile.flatPhotoUrls.length);
+  if (missingSelf > 0 || missingFlat > 0) {
+    const parts: string[] = [];
+    if (missingSelf > 0) parts.push(`${missingSelf} more photo${missingSelf === 1 ? "" : "s"} of you`);
+    if (missingFlat > 0) parts.push(`${missingFlat} more of your flat`);
+    items.push({
+      key: "photos",
+      section: "media",
+      icon: "📸",
+      message: (
+        <>
+          <strong>Add {parts.join(" and ")}.</strong> Your listing won&apos;t show to anyone until you do.
+        </>
+      ),
+    });
+  }
+
+  const promptCount = profile.prompts.filter((p) => p.question && p.answer.trim().length > 0).length;
+  if (promptCount < MIN_PROMPT_COUNT) {
+    const missing = MIN_PROMPT_COUNT - promptCount;
+    items.push({
+      key: "prompts",
+      section: "personal",
+      icon: "💬",
+      message: (
+        <>
+          <strong>
+            Answer {missing} more profile prompt{missing === 1 ? "" : "s"}.
+          </strong>{" "}
+          A little personality goes a long way in a swap decision.
+        </>
+      ),
+    });
+  }
+
+  if (!hasPaymentMethod) {
+    items.push({
+      key: "payment",
+      section: "payment",
+      icon: "💸",
+      message: (
+        <>
+          <strong>Add how you&apos;d like to get paid.</strong> You&apos;ll need this before you can confirm a swap
+          where you&apos;re owed money.
+        </>
+      ),
+    });
+  }
+
+  if (!profile.roomType) {
+    items.push({
+      key: "roomType",
+      section: "accommodation",
+      icon: "🏠",
+      message: <strong>Add your room type.</strong>,
+    });
+  }
+  if (profile.amenities.length === 0) {
+    items.push({
+      key: "amenities",
+      section: "accommodation",
+      icon: "🧰",
+      message: <strong>Add a few amenities.</strong>,
+    });
+  }
+  if (!profile.neighbourhood) {
+    items.push({
+      key: "neighbourhood",
+      section: "accommodation",
+      icon: "📍",
+      message: <strong>Add your neighbourhood or area.</strong>,
+    });
+  }
+  if (!profile.smoker) {
+    items.push({
+      key: "smoker",
+      section: "preferences",
+      icon: "🚬",
+      message: <strong>Let people know if you smoke.</strong>,
+    });
+  }
+  if (!profile.pets) {
+    items.push({
+      key: "pets",
+      section: "preferences",
+      icon: "🐾",
+      message: <strong>Let people know about pets.</strong>,
+    });
+  }
+  if (!profile.selfDescription) {
+    items.push({
+      key: "selfDescription",
+      section: "personal",
+      icon: "📝",
+      message: <strong>Write a bit about yourself.</strong>,
+    });
+  }
+  if (!profile.flatDescription) {
+    items.push({
+      key: "flatDescription",
+      section: "accommodation",
+      icon: "🏡",
+      message: <strong>Write a bit about your flat.</strong>,
+    });
+  }
+  if (!profile.address) {
+    items.push({
+      key: "address",
+      section: "accommodation",
+      icon: "📍",
+      message: <strong>Add your exact address.</strong>,
+    });
+  }
+
+  return items;
 }
 
 interface SimpleField {
@@ -288,17 +414,35 @@ export default function ProfileView({
   });
   const [paymentDraft, setPaymentDraft] = useState<PaymentMethodValue>(payment);
 
-  // Drives both ProfileCompletionBanner above and the section-level
-  // highlight rings below, so the fix always happens right where the nudge
-  // points.
+  // Drives the "Add more" badges inside the Media section itself.
   const needsSelfPhotos = profile.selfPhotoUrls.length < MIN_SELF_PHOTO_COUNT;
   const needsFlatPhotos = profile.flatPhotoUrls.length < MIN_FLAT_PHOTO_COUNT;
+
+  // Drives both ProfileCompletionBanner above and which section gets the
+  // highlight ring below, so the fix always happens right where the nudge
+  // points — only the single top item at a time, matching the one banner
+  // shown at a time.
+  const hasPaymentMethod = Boolean(payment.paymentMethod && payment.paymentHandle);
+  const topItem = computeChecklist(profile, hasPaymentMethod)[0] ?? null;
 
   function startEditing(section: SectionKey) {
     setDraft(profile);
     if (section === "payment") setPaymentDraft(payment);
     setEditingSection(section);
     setError(null);
+  }
+
+  // The banner opens the right section's editor in place and scrolls it
+  // into view, rather than just linking to the top of the page and leaving
+  // the student to hunt for where "add prompts" actually lives (it's
+  // inside the Personal profile editor, not its own visible control).
+  function handleBannerClick() {
+    if (!topItem) return;
+    startEditing(topItem.section);
+    // The target section's Surface exists in the DOM either way (edit mode
+    // only changes its contents, not its presence), so this doesn't need to
+    // wait for the re-render triggered by startEditing above.
+    document.getElementById(`section-${topItem.section}`)?.scrollIntoView({ behavior: "auto", block: "start" });
   }
 
   function cancelEditing() {
@@ -366,12 +510,7 @@ export default function ProfileView({
       <div className="mx-auto w-full max-w-2xl">
       <h1 className="mb-5 font-display text-3xl font-bold text-chalk">Your profile</h1>
 
-      <ProfileCompletionBanner
-        selfPhotoCount={profile.selfPhotoUrls.length}
-        flatPhotoCount={profile.flatPhotoUrls.length}
-        promptCount={profile.prompts.filter((p) => p.question && p.answer.trim().length > 0).length}
-        hasPaymentMethod={Boolean(payment.paymentMethod && payment.paymentHandle)}
-      />
+      <ProfileCompletionBanner item={topItem} onClick={handleBannerClick} />
 
       <div className="mb-6 flex rounded-full bg-white p-1 shadow-surface">
         <button
@@ -406,9 +545,11 @@ export default function ProfileView({
       <div className="flex flex-col gap-4">
       {/* Personal profile: identity + free-text answers */}
       <SectionCard
+        id="section-personal"
         title={SECTION_TITLES.personal}
         editing={editingSection === "personal"}
         onEdit={() => startEditing("personal")}
+        needsAttention={topItem?.section === "personal"}
       >
         {editingSection === "personal" && draft ? (
           <div className="flex flex-col gap-4">
@@ -445,9 +586,11 @@ export default function ProfileView({
 
       {/* Accommodation: the flat itself */}
       <SectionCard
+        id="section-accommodation"
         title={SECTION_TITLES.accommodation}
         editing={editingSection === "accommodation"}
         onEdit={() => startEditing("accommodation")}
+        needsAttention={topItem?.section === "accommodation"}
       >
         {editingSection === "accommodation" && draft ? (
           <div className="flex flex-col gap-4">
@@ -479,9 +622,11 @@ export default function ProfileView({
 
       {/* Availability and pricing */}
       <SectionCard
+        id="section-availability"
         title={SECTION_TITLES.availability}
         editing={editingSection === "availability"}
         onEdit={() => startEditing("availability")}
+        needsAttention={topItem?.section === "availability"}
       >
         {editingSection === "availability" && draft ? (
           <div className="flex flex-col gap-4">
@@ -504,9 +649,11 @@ export default function ProfileView({
 
       {/* Preferences */}
       <SectionCard
+        id="section-preferences"
         title={SECTION_TITLES.preferences}
         editing={editingSection === "preferences"}
         onEdit={() => startEditing("preferences")}
+        needsAttention={topItem?.section === "preferences"}
       >
         {editingSection === "preferences" && draft ? (
           <div className="flex flex-col gap-4">
@@ -529,9 +676,11 @@ export default function ProfileView({
 
       {/* Payment and compliance: how you're paid, plus rental registration */}
       <SectionCard
+        id="section-payment"
         title={SECTION_TITLES.payment}
         editing={editingSection === "payment"}
         onEdit={() => startEditing("payment")}
+        needsAttention={topItem?.section === "payment"}
       >
         {editingSection === "payment" && draft ? (
           <div className="flex flex-col gap-4">
@@ -598,10 +747,11 @@ export default function ProfileView({
 
       {/* Media: photos + video */}
       <SectionCard
+        id="section-media"
         title={SECTION_TITLES.media}
         editing={editingSection === "media"}
         onEdit={() => startEditing("media")}
-        needsAttention={needsSelfPhotos || needsFlatPhotos}
+        needsAttention={topItem?.section === "media"}
       >
         {editingSection === "media" && draft ? (
           <div className="flex flex-col gap-4">
@@ -732,12 +882,14 @@ function FieldRow({ label, value }: { label: string; value: string }) {
 }
 
 function SectionCard({
+  id,
   title,
   editing,
   onEdit,
   needsAttention = false,
   children,
 }: {
+  id?: string;
   title: string;
   editing: boolean;
   onEdit: () => void;
@@ -745,7 +897,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Surface className={`p-5 ${needsAttention ? "ring-2 ring-bloom/60" : ""}`}>
+    <Surface id={id} className={`p-5 ${needsAttention ? "ring-2 ring-bloom/60" : ""}`}>
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-semibold text-chalk">{title}</span>
         {!editing && (

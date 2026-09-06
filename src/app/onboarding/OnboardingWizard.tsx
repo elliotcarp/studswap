@@ -152,7 +152,6 @@ const STEPS: StepDef[] = [
   {
     icon: "🏠",
     title: "Where's your flat?",
-    subtitle: "Pick your city from the list. This keeps location filtering exact.",
     render: (data, setField) => (
       <CityPicker value={data.homeCity} onChange={(city) => setField("homeCity", city)} />
     ),
@@ -212,7 +211,7 @@ const STEPS: StepDef[] = [
     title: "What's a fair price?",
     subtitle: (data) =>
       data.arrangementPreference === "Mutual swap only"
-        ? "Used only to calculate the fairness gap between your flat and a swap partner's — you're never charged or paid this directly, you just settle the difference between you."
+        ? "Used only to calculate the fairness gap between your flat and a swap partner's. You're never charged or paid this directly, you just settle the difference between you."
         : data.arrangementPreference === "Paid stay only"
           ? "This is what you'll actually charge someone to book your place directly, paid person-to-person, StudSwap never touches it."
           : "For a swap, this is only used to calculate the fairness gap with a partner's place. For a paid stay, it's what you'll actually charge, person-to-person.",

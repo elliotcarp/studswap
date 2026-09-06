@@ -27,6 +27,22 @@ function formatDateRange(fromIso: string, toIso: string) {
   return `${from.toLocaleDateString("en-US", opts)} to ${to.toLocaleDateString("en-US", opts)}`;
 }
 
+// See AMENITY_OPTIONS in onboardingOptions.ts, the source of truth for the
+// set — this is purely cosmetic, an unmapped amenity just falls back to a
+// bullet (see the "•" default where this is used).
+const AMENITY_ICONS: Record<string, string> = {
+  Wifi: "📶",
+  "Washing machine": "🧺",
+  Dishwasher: "🍽️",
+  "Air conditioning": "❄️",
+  Heating: "🔥",
+  Workspace: "💻",
+  TV: "📺",
+  Parking: "🅿️",
+  Elevator: "🛗",
+  Balcony: "🌇",
+};
+
 function Badge({ children }: { children: React.ReactNode }) {
   return (
     <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
@@ -261,12 +277,22 @@ export default function ProfileCard({
               {profile.yearOfStudy}
             </span>
             {profile.roomType && <Badge>{profile.roomType}</Badge>}
-            {profile.arrangementPreference && <Badge>🔁 {profile.arrangementPreference}</Badge>}
+            {profile.arrangementPreference && (
+              <span className="rounded-full bg-gradient-to-r from-riviera/15 to-bloom/15 px-3 py-1 text-xs font-semibold text-riviera-strong">
+                🔁 {profile.arrangementPreference}
+              </span>
+            )}
           </div>
           {profile.amenities.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {profile.amenities.map((a) => (
-                <Badge key={a}>{a}</Badge>
+                <span
+                  key={a}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 shadow-sm"
+                >
+                  <span aria-hidden>{AMENITY_ICONS[a] ?? "•"}</span>
+                  {a}
+                </span>
               ))}
             </div>
           )}

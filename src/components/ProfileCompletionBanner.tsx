@@ -1,94 +1,62 @@
 "use client";
 
-// Hinge-style nudge: onboarding only collects essential setup (see
-// OnboardingWizard.tsx) — photos, prompts, and payment are deferred here,
-// shown on the profile page until they're actually filled in. Dismissible
-// per visit (state lives only in this component, nothing persisted), so it
-// comes back on the next page load rather than being gone for good the
-// first time someone taps the ×.
+// Presentational only: the caller computes what's missing and hands over
+// the single top item to show (see ProfileView.tsx's checklist, or
+// SwipeView.tsx's simpler photos/prompts/payment version) — this just
+// renders it and offers a dismiss that comes back once that specific item
+// is fixed and a new one takes its place (tracked by `item.key`, not just
+// "was the banner ever dismissed").
 //
-// Photos are called out first since they gate discovery visibility itself
-// (see /api/profile GET) — a profile missing them isn't shown to anyone yet,
-// not just "less complete."
+// On /profile, `onClick` opens the right section's editor in place instead
+// of navigating (see ProfileView.tsx). Anywhere else (e.g. the swipe deck),
+// omitting `onClick` falls back to a plain link to /profile.
 
 import { useState } from "react";
 import Link from "next/link";
-import { MIN_SELF_PHOTO_COUNT, MIN_FLAT_PHOTO_COUNT } from "@/lib/onboardingOptions";
-import { MIN_PROMPT_COUNT } from "@/lib/prompts";
 
-export default function ProfileCompletionBanner({
-  selfPhotoCount,
-  flatPhotoCount,
-  promptCount,
-  hasPaymentMethod,
-}: {
-  selfPhotoCount: number;
-  flatPhotoCount: number;
-  promptCount: number;
-  hasPaymentMethod: boolean;
-}) {
-  const [dismissed, setDismissed] = useState(false);
-  const missingSelf = Math.max(0, MIN_SELF_PHOTO_COUNT - selfPhotoCount);
-  const missingFlat = Math.max(0, MIN_FLAT_PHOTO_COUNT - flatPhotoCount);
-  const missingPrompts = Math.max(0, MIN_PROMPT_COUNT - promptCount);
-
-  if (dismissed) return null;
-
-  // Photos first: without them the listing isn't shown to anyone yet, not
-  // just "less complete" — a materially bigger deal than the other two.
-  if (missingSelf > 0 || missingFlat > 0) {
-    const parts: string[] = [];
-    if (missingSelf > 0) parts.push(`${missingSelf} more photo${missingSelf === 1 ? "" : "s"} of you`);
-    if (missingFlat > 0) parts.push(`${missingFlat} more of your flat`);
-    return (
-      <Banner icon="📸" onDismiss={() => setDismissed(true)}>
-        <strong>Add {parts.join(" and ")}.</strong> Your listing won&apos;t show to anyone until you do —
-        profiles with no photos aren&apos;t real listings yet.
-      </Banner>
-    );
-  }
-
-  if (missingPrompts > 0) {
-    return (
-      <Banner icon="💬" onDismiss={() => setDismissed(true)}>
-        <strong>Answer {missingPrompts} more profile prompt{missingPrompts === 1 ? "" : "s"}.</strong> A
-        little personality goes a long way in a swap decision.
-      </Banner>
-    );
-  }
-
-  if (!hasPaymentMethod) {
-    return (
-      <Banner icon="💸" onDismiss={() => setDismissed(true)}>
-        <strong>Add how you'd like to get paid.</strong> You'll need this set before you can confirm a
-        swap where you're owed money — StudSwap never touches it.
-      </Banner>
-    );
-  }
-
-  return null;
+export interface ChecklistItem {
+  key: string;
+  icon: string;
+  message: React.ReactNode;
 }
 
-function Banner({
-  icon,
-  onDismiss,
-  children,
+export default function ProfileCompletionBanner({
+  item,
+  onClick,
 }: {
-  icon: string;
-  onDismiss: () => void;
-  children: React.ReactNode;
+  item: ChecklistItem | null;
+  onClick?: () => void;
 }) {
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  if (!item || item.key === dismissedKey) return null;
+
+  const content = (
+    <>
+      <span className="text-lg" aria-hidden>
+        {item.icon}
+      </span>
+      <span className="flex-1">{item.message}</span>
+    </>
+  );
+
   return (
     <div className="mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-bloom/15 to-riviera/15 px-4 py-3 text-sm text-riviera-strong">
-      <Link href="/profile" className="flex flex-1 items-center gap-3 transition-transform active:scale-[0.99]">
-        <span className="text-lg" aria-hidden>
-          {icon}
-        </span>
-        <span className="flex-1">{children}</span>
-      </Link>
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          className="flex flex-1 items-center gap-3 text-left transition-transform active:scale-[0.99]"
+        >
+          {content}
+        </button>
+      ) : (
+        <Link href="/profile" className="flex flex-1 items-center gap-3 transition-transform active:scale-[0.99]">
+          {content}
+        </Link>
+      )}
       <button
         type="button"
-        onClick={onDismiss}
+        onClick={() => setDismissedKey(item.key)}
         aria-label="Dismiss"
         className="flex-shrink-0 px-1 text-riviera-strong/60 hover:text-riviera-strong"
       >
